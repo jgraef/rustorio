@@ -38,7 +38,7 @@ def parse_type(parts, inner=False):
             ty = {"table_of": None}
             parts = parts[1:]
     else:
-        ty = parts[0]
+        ty = strip_if_starts_with(parts[0], "Types/")
         parts = parts[1:]
 
     if len(parts) > 0 and parts[0].lower() == "or" and not inner:

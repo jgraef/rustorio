@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+#![feature(associated_type_defaults)]
 
 pub mod config;
 pub mod error;
