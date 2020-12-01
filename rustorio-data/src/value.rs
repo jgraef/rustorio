@@ -1,27 +1,15 @@
 use std::{
-    collections::btree_map::{BTreeMap, IntoIter, Iter},
+    collections::btree_map::{BTreeMap, Iter},
     convert::{TryFrom, TryInto},
     fmt::{self, Debug, Formatter},
     iter::FromIterator,
 };
 
+use derive_more::{From, Into, AsRef, AsMut, IntoIterator};
+#[cfg(feature="serde")]
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("Can't convert Lua value: {0}")]
-    Inconvertible(String),
-
-    #[error("Lua error: {0}")]
-    Lua(#[from] mlua::Error),
-}
-
-impl Error {
-    fn inconvertible(x: mlua::Value) -> Self {
-        Self::Inconvertible(format!("{:?}", x))
-    }
-}
+use super::{FromLuaValue, Error};
 
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
@@ -43,8 +31,8 @@ impl Type {
     }
 }
 
-
-#[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature="serde", derive(Serialize, Deserialize))]
 pub enum Key {
     Nil,
     Boolean(bool),
@@ -106,8 +94,8 @@ impl Debug for Key {
     }
 }
 
-#[derive(Clone, Default, Serialize, Deserialize)]
-#[serde(transparent)]
+#[derive(Clone, Default, AsRef, AsMut, Into, From, IntoIterator)]
+#[cfg_attr(feature="serde", derive(Serialize, Deserialize), serde(transparent))]
 pub struct Table(BTreeMap<Key, Value>);
 
 impl Table {
@@ -119,51 +107,22 @@ impl Table {
         self.0.iter()
     }
 
-    fn get(&self, k: &Key) -> Option<&Value> {
+    pub fn get(&self, k: &Key) -> Option<&Value> {
         self.0.get(k)
     }
 
-    fn insert(&mut self, k: Key, v: Value) -> Option<Value> {
-        self.0.insert(k, v)
+    pub fn get_mut(&mut self, k: &Key) -> Option<&mut Value> {
+        self.0.get_mut(k)
     }
-}
 
-impl IntoIterator for Table {
-    type Item = (Key, Value);
-    type IntoIter = IntoIter<Key, Value>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
+    pub fn insert(&mut self, k: Key, v: Value) -> Option<Value> {
+        self.0.insert(k, v)
     }
 }
 
 impl FromIterator<(Key, Value)> for Table {
     fn from_iter<T: IntoIterator<Item = (Key, Value)>>(iter: T) -> Self {
         Table(BTreeMap::from_iter(iter))
-    }
-}
-
-impl AsRef<BTreeMap<Key, Value>> for Table {
-    fn as_ref(&self) -> &BTreeMap<Key, Value> {
-        &self.0
-    }
-}
-
-impl AsMut<BTreeMap<Key, Value>> for Table {
-    fn as_mut(&mut self) -> &mut BTreeMap<Key, Value> {
-        &mut self.0
-    }
-}
-
-impl From<Table> for BTreeMap<Key, Value> {
-    fn from(t: Table) -> Self {
-        t.0
-    }
-}
-
-impl From<BTreeMap<Key, Value>> for Table {
-    fn from(t: BTreeMap<Key, Value>) -> Self {
-        Table(t)
     }
 }
 
@@ -195,7 +154,8 @@ impl Debug for Table {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone)]
+#[cfg_attr(feature="serde", derive(Serialize, Deserialize))]
 pub enum Value {
     Nil,
     Boolean(bool),
@@ -286,5 +246,17 @@ impl TryFrom<mlua::Value<'_>> for Value {
             mlua::Value::Table(x) => Ok(Value::Table(x.try_into()?)),
             x => Err(Error::inconvertible(x)),
         }
+    }
+}
+
+impl FromLuaValue for Value {
+    fn from_lua_value(value: mlua::Value) -> Result<Self, Error> {
+        Value::try_from(value)
+    }
+}
+
+impl FromLuaValue for Key {
+    fn from_lua_value(value: mlua::Value) -> Result<Self, Error> {
+        Key::try_from(value)
     }
 }

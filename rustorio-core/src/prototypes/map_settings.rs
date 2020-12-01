@@ -1,7 +1,8 @@
-use serde::{Serialize, Deserialize};
-        
-use super::{Prototype, type_stubs::*};
-        
+use serde::{Deserialize, Serialize};
+
+use super::Prototype;
+use crate::types::*; // TODO: Import only specific types
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MapSettings {
     /// difficulty_settings :: table
@@ -14,10 +15,10 @@ pub struct MapSettings {
     enemy_expansion: Vec<Todo>,
 
     /// max_failed_behavior_count :: uint32
-    max_failed_behavior_count: u32,    
+    max_failed_behavior_count: u32,
 
     /// name :: string
-    name: String,    
+    name: String,
 
     /// path_finder :: table
     path_finder: Vec<Todo>,
@@ -29,15 +30,12 @@ pub struct MapSettings {
     steering: Vec<Todo>,
 
     /// type :: string
-    r#type: String,    
+    r#type: String,
 
     /// unit_group :: table
     unit_group: Vec<Todo>,
-
 }
 
 impl Prototype for MapSettings {
     const TYPE: Option<&'static str> = Some("map-settings");
 }
-
-

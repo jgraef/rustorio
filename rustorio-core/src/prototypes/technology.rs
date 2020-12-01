@@ -1,26 +1,27 @@
-use serde::{Serialize, Deserialize};
-        
-use super::{Prototype, type_stubs::*};
-        
+use serde::{Deserialize, Serialize};
+
+use super::Prototype;
+use crate::types::*; // TODO: Import only specific types
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Technology {
     /// icons, icon, icon_size (IconSpecification) :: IconSpecification
-    icon_spec: IconSpecification,    
+    icon_spec: IconSpecification,
 
     /// unit :: table
     unit: Vec<Todo>,
 
     /// effects :: table of Modifier (optional)
-    effects: Option<Vec<Modifier>>,    
+    effects: Option<Vec<Modifier>>,
 
     /// enabled :: bool (optional)
-    enabled: Option<bool>,    
+    enabled: Option<bool>,
 
     /// expensive :: Technology data or bool (optional)
     expensive: Option<Todo>,
 
     /// hidden :: bool (optional)
-    hidden: Option<bool>,    
+    hidden: Option<bool>,
 
     /// max_level :: uint32 or string (optional)
     max_level: Option<Todo>,
@@ -32,15 +33,12 @@ pub struct Technology {
     prerequisites: Option<Vec<String>>,
 
     /// upgrade :: bool (optional)
-    upgrade: Option<bool>,    
+    upgrade: Option<bool>,
 
     /// visible_when_disabled :: bool (optional)
-    visible_when_disabled: Option<bool>,    
-
+    visible_when_disabled: Option<bool>,
 }
 
 impl Prototype for Technology {
     const TYPE: Option<&'static str> = Some("technology");
 }
-
-

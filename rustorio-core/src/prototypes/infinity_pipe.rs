@@ -1,16 +1,14 @@
-use serde::{Serialize, Deserialize};
-        
-use super::{Prototype, type_stubs::*};
-        
+use serde::{Deserialize, Serialize};
+
+use super::Prototype;
+use crate::types::*; // TODO: Import only specific types
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct InfinityPipe {
     /// gui_mode :: string (optional)
-    gui_mode: Option<String>,    
-
+    gui_mode: Option<String>,
 }
 
 impl Prototype for InfinityPipe {
     const TYPE: Option<&'static str> = Some("infinity-pipe");
 }
-
-

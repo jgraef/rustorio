@@ -1,22 +1,20 @@
-use serde::{Serialize, Deserialize};
-        
-use super::{Prototype, type_stubs::*};
-        
+use serde::{Deserialize, Serialize};
+
+use super::Prototype;
+use crate::types::*; // TODO: Import only specific types
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct WindSound {
     /// name :: string
-    name: String,    
+    name: String,
 
     /// sound :: Sound
-    sound: Sound,    
+    sound: Sound,
 
     /// type :: string
-    r#type: String,    
-
+    r#type: String,
 }
 
 impl Prototype for WindSound {
     const TYPE: Option<&'static str> = Some("wind-sound");
 }
-
-

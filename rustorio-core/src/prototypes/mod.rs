@@ -138,6 +138,7 @@ pub mod produce_achievement;
 pub mod produce_per_hour_achievement;
 pub mod programmable_speaker;
 pub mod projectile;
+pub mod prototype_base;
 pub mod pump;
 pub mod radar;
 pub mod rail;
@@ -202,13 +203,14 @@ pub mod vehicle;
 pub mod virtual_signal;
 pub mod wall;
 pub mod wind_sound;
-pub mod prototype_base;
 
-pub mod type_stubs;
-    
 pub trait Prototype {
     const TYPE: Option<&'static str>;
 
+    fn name(&self) -> &str {
+        // TODO: "Cast" to PrototypeBase and get name
+        todo!()
+    }
+
     type Extends: Prototype = prototype_base::PrototypeBase;
-}    
-    
+}

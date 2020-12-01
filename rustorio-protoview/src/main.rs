@@ -12,9 +12,10 @@ use cursive_tree_view::{Placement, TreeView};
 
 use rustorio_core::{
     error::Error,
-    lua_utils::data::{Key, Table, Value},
     mod_loader::ModLoader,
 };
+use rustorio_data::value::{Value, Table, Key};
+
 
 #[derive(Debug)]
 enum Item {
@@ -95,7 +96,6 @@ impl View for PrototypeTree {
         self.view.take_focus(direction)
     }
 }
-
 
 fn main() -> Result<(), Error> {
     dotenv::dotenv().ok();

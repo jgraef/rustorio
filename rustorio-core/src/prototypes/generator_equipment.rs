@@ -1,19 +1,17 @@
-use serde::{Serialize, Deserialize};
-        
-use super::{Prototype, type_stubs::*};
-        
+use serde::{Deserialize, Serialize};
+
+use super::Prototype;
+use crate::types::*; // TODO: Import only specific types
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GeneratorEquipment {
     /// power :: Energy
-    power: Energy,    
+    power: Energy,
 
     /// burner :: EnergySource (optional)
-    burner: Option<EnergySource>,    
-
+    burner: Option<EnergySource>,
 }
 
 impl Prototype for GeneratorEquipment {
     const TYPE: Option<&'static str> = Some("generator-equipment");
 }
-
-

@@ -1,5 +1,3 @@
-pub mod data;
-
 use std::{
     fs::File,
     io::{BufReader, Read},
@@ -9,6 +7,7 @@ use std::{
 use mlua::{Lua, Table, Value};
 
 use crate::error::Error;
+
 
 pub fn run_code<C: AsRef<[u8]>, N: AsRef<str>>(lua: &mut Lua, code: C, name: N) -> Result<(), Error> {
     lua.load(code.as_ref()).set_name(name.as_ref())?.exec()?;

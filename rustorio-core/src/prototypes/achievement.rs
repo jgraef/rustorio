@@ -1,25 +1,23 @@
-use serde::{Serialize, Deserialize};
-        
-use super::{Prototype, type_stubs::*};
-        
+use serde::{Deserialize, Serialize};
+
+use super::Prototype;
+use crate::types::*; // TODO: Import only specific types
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Achievement {
     /// icons, icon, icon_size (IconSpecification) :: IconSpecification
-    icon_spec: IconSpecification,    
+    icon_spec: IconSpecification,
 
     /// allowed_without_fight :: bool (optional)
-    allowed_without_fight: Option<bool>,    
+    allowed_without_fight: Option<bool>,
 
     /// hidden :: bool (optional)
-    hidden: Option<bool>,    
+    hidden: Option<bool>,
 
     /// steam_stats_name :: string (optional)
-    steam_stats_name: Option<String>,    
-
+    steam_stats_name: Option<String>,
 }
 
 impl Prototype for Achievement {
     const TYPE: Option<&'static str> = Some("achievement");
 }
-
-

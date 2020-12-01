@@ -15,8 +15,9 @@ use serde::Deserialize;
 use thiserror::Error;
 
 use rustorio_proptree::Value as PropertyTree;
+use rustorio_data::value::Value;
 
-use crate::{error::Error, lua_utils, lua_utils::data::Value, version::Version};
+use crate::{error::Error, lua_utils, version::Version};
 use std::convert::TryInto;
 
 #[derive(Clone, Debug, Deserialize)]

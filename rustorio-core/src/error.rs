@@ -36,5 +36,5 @@ pub enum Error {
     Format(#[from] std::fmt::Error),
 
     #[error("Error while converting Lua value: {0}")]
-    LuaData(#[from] crate::lua_utils::data::Error),
+    LuaData(#[from] rustorio_data::Error),
 }

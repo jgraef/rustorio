@@ -1,16 +1,14 @@
-use serde::{Serialize, Deserialize};
-        
-use super::{Prototype, type_stubs::*};
-        
+use serde::{Deserialize, Serialize};
+
+use super::Prototype;
+use crate::types::*; // TODO: Import only specific types
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GroupAttackAchievement {
     /// amount :: uint32 (optional)
-    amount: Option<u32>,    
-
+    amount: Option<u32>,
 }
 
 impl Prototype for GroupAttackAchievement {
     const TYPE: Option<&'static str> = Some("group-attack-achievement");
 }
-
-

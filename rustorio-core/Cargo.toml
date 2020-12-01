@@ -15,8 +15,15 @@ regex = "1.4"
 lazy_static = "1.4"
 legion = "0.3"
 byteorder = "1.3"
+nalgebra = { version = "0.23", features = ["serde-serialize"] }
+derive_more = "0.99"
+palette = { version = "0.5", features = ["serializing"] }
+num = "0.3"
+bitflags = "1.2"
 
 rustorio-proptree = { path = "../rustorio-proptree" }
+rustorio-data = { path = "../rustorio-data" }
+rustorio-data-derive = { path = "../rustorio-data-derive" }
 
 [dev-dependencies]
 pretty_env_logger = "0.4"

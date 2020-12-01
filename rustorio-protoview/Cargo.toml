@@ -12,3 +12,4 @@ cursive = "0.14"
 cursive_tree_view = "0.6"
 
 rustorio-core = { path = "../rustorio-core" }
+rustorio-data = { path = "../rustorio-data" }

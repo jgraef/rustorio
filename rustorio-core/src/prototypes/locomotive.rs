@@ -1,7 +1,8 @@
-use serde::{Serialize, Deserialize};
-        
-use super::{Prototype, type_stubs::*};
-        
+use serde::{Deserialize, Serialize};
+
+use super::Prototype;
+use crate::types::*; // TODO: Import only specific types
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Locomotive {
     /// burner or energy_source :: EnergySource
@@ -9,18 +10,15 @@ pub struct Locomotive {
     energy_source: Option<EnergySource>, // TODO enum
 
     /// max_power :: Energy
-    max_power: Energy,    
+    max_power: Energy,
 
     /// reversing_power_modifier :: double
-    reversing_power_modifier: f64,    
+    reversing_power_modifier: f64,
 
     /// front_light :: LightDefinition (optional)
-    front_light: Option<LightDefinition>,    
-
+    front_light: Option<LightDefinition>,
 }
 
 impl Prototype for Locomotive {
     const TYPE: Option<&'static str> = Some("locomotive");
 }
-
-

@@ -1,6 +1,8 @@
 [workspace]
 members = [
     "rustorio-core",
+    "rustorio-data",
+    "rustorio-data-derive",
     "rustorio-main",
     "rustorio-proptree",
     "rustorio-protoview",
