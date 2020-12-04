@@ -37,4 +37,7 @@ pub enum Error {
 
     #[error("Error while converting Lua value: {0}")]
     LuaData(#[from] rustorio_data::Error),
+
+    #[error("Missing prototype loader: {0}")]
+    MissingPrototypeLoader(String),
 }

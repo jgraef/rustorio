@@ -1,0 +1,18 @@
+[package]
+name = "factorio-remote"
+version = "0.1.0"
+authors = ["Janosch Gräf <janosch.graef@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+log = "0.4"
+thiserror = "1.0"
+rcon = "0.3"
+tokio = { version = "0.2", features = ["macros", "sync", "time"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+factorio-data = { path = "../factorio-data" }
+
+[dev-dependencies]
+dotenv = "0.15"
+pretty_env_logger = "0.4"

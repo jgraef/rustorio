@@ -4,25 +4,6 @@ use crate::{FromLuaTable, FromLuaValue, Error, to_option, to_result};
 use mlua::{Value, Table};
 
 
-pub fn vec_from_fields<T>(table: &Table, name_both: &'static str, name_x: &'static str, name_y: &'static str) -> Result<Vector2<T>, Error>
-    where T: Scalar + FromLuaValue + Clone,
-{
-    let value_both = table.get::<_, Value>(name_both)?;
-    match value_both {
-        Value::Table(table) => return Ok(Vector2::from_lua_table(table)?),
-        Value::Nil => {
-            let x = T::from_lua_value(table.get::<_, Value>(name_x)?)?;
-            let y = T::from_lua_value(table.get::<_, Value>(name_y)?)?;
-            Ok(Vector2::new(x, y))
-        }
-        value => {
-            let x = T::from_lua_value(value)?;
-            let y = x.clone();
-            return Ok(Vector2::new(x, y));
-        },
-    }
-}
-
 
 impl<T> FromLuaTable for Vector2<T>
     where T: Scalar + FromLuaValue

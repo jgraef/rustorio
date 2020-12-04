@@ -15,7 +15,6 @@ use std::{
 };
 
 use derive_more::{AsMut, AsRef, Display, From, Into};
-use num::Float;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use palette::LinSrgba;
@@ -23,6 +22,7 @@ use mlua::{Value, Table};
 
 use crate::prototypes::{
     ammo_category::AmmoCategory, artillery_flare::ArtilleryFlare, autoplace_control::AutoplaceControl, damage_type::DamageType, equipment::Equipment,
+    fuel_category::FuelCategory, fluid::Fluid,
     tile::Tile, Prototype,
 };
 
@@ -30,7 +30,7 @@ pub use bounding_box::BoundingBox;
 pub use collision_mask::CollisionMask;
 pub use nalgebra::{Vector2, Vector3, Point2, Point3};
 
-use rustorio_data::{FromLuaValue, FromLuaTable, Error};
+use rustorio_data::{FromLuaValue, FromLuaTable, Error, to_option, to_result};
 
 
 pub type Color = LinSrgba<f32>;
@@ -39,17 +39,45 @@ pub type SpriteSizeType = i16;
 
 pub type SpriteSize = Vector2<f32>;
 
-// Used for defaults
+pub fn size_from_fields(table: &Table) -> Result<Vector2<SpriteSizeType>, Error> {
+    match table.get::<_, Value>("size")? {
+        Value::Nil => {
+            log::debug!("size_from_fields: size=nil");
+            let width = to_option(table.get("width")?)?.unwrap_or_default();
+            let height = to_option(table.get("height")?)?.unwrap_or_default();
+            Ok(Vector2::new(width, height))
+        },
+        Value::Table(table) => {
+            log::debug!("size_from_fields: size is table");
+            Ok(Vector2::from_lua_table(table)?)
+        },
+        value => {
+            log::debug!("size_from_fields: size is value");
+            let x = SpriteSizeType::from_lua_value(value)?;
+            let y = x.clone();
+            Ok(Vector2::new(x, y))
+        },
+    }
 
-#[inline]
-fn color_white() -> Color {
-    Color::new(1., 1., 1., 0.)
 }
 
-#[inline]
-fn bool_true() -> bool {
-    true
+pub fn position_from_fields(table: &Table) -> Result<Vector2<SpriteSizeType>, Error> {
+    let x: SpriteSizeType = to_option(table.get::<_, Value>("x")?)?.unwrap_or_default();
+    let y: SpriteSizeType = to_option(table.get::<_, Value>("y")?)?.unwrap_or_default();
+
+    if x == 0 && y == 0 {
+        Ok(to_option(table.get::<_, Value>("size")?)?.unwrap_or_default())
+    }
+    else {
+        Ok(Vector2::default())
+    }
 }
+
+pub fn dice_from_fields(_table: &Table) -> Result<Vector2<i16>, Error> {
+    // TODO
+    Ok(Vector2::default())
+}
+
 
 /// Reference to a prototype instance
 ///
@@ -118,61 +146,15 @@ impl Default for RunMode {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaTable)]
+// TODO: This contains all fields from Sprite. So we could just use that flattened
 pub struct Animation {
-    #[lua(default)]
-    pub layers: Vec<Animation>,
-
-    //#[lua(default)]
-    //pub hr_version: Option<Box<Animation>>,
-
-    pub filename: FileName,
-
-    #[lua(default)]
-    pub priority: SpritePriority,
-
-    #[lua(default)]
-    pub flags: SpriteFlags,
-
-    #[serde(flatten)]
-    pub size: Vector2<f32>,
-
-    #[serde(flatten)]
-    pub position: Point2<f32>,
-
-    #[lua(default)]
-    pub shift: Vector2<f32>,
-
-    #[lua(default)]
-    pub scale: f64,
-
-    #[lua(default)]
-    pub draw_as_shadow: bool,
-
-    #[lua(default)]
-    pub mipmap_count: u8,
-
-    #[lua(default)]
-    pub apply_runtime_tint: bool,
-
-    #[serde(default = "color_white")]
-    pub tint: Color,
-
-    #[lua(default)]
-    pub blend_mode: BlendMode,
-
-    #[lua(default)]
-    pub load_in_minimal_mode: bool,
-
-    #[lua(default_with = "true")]
-    pub premul_alpha: bool,
-
-    #[lua(default)]
-    pub generate_sdf: bool,
+    #[lua(flatten)]
+    sprite: Sprite,
 
     #[lua(default)]
     pub run_mode: RunMode,
 
-    #[lua(default_with = "1")]
+    #[lua(default_with="1")]
     pub frame_count: u32, // NOTE: Can't be 0
 
     /// Once the specified number of pictures is loaded, other pictures are loaded on other line. This is to allow having longer animations in matrix, to avoid pictures with too big width. The game engine limits the width of any input picture to 2048px, so it is compatible with most graphics cards.
@@ -180,27 +162,32 @@ pub struct Animation {
     pub line_length: u32,
 
     /// Modifier of the animation playing speed, the default is 1, which means one animation frame per tick (60 fps). The speed of playing can often vary depending on the usage (output of steam engine for example). Has to be greater than 0.
-    #[lua(default_with = "1.")]
+    #[lua(default_with="1.")]
     pub animation_speed: f32,
 
-    #[serde(default = "Float::max_value")]
-    pub max_advance: f32,
+    #[lua(default)]
+    pub max_advance: Option<f32>,
 
-    #[lua(default_with = "1")]
+    #[lua(default_with="1")]
     pub repeat_count: u8, // NOTE: Can't be 0
 
-    // TODO
-    pub dice: Vector2<f32>,
-
-    pub frame_sequence: AnimationFrameSequence,
+    #[lua(default)]
+    pub frame_sequence: Option<AnimationFrameSequence>,
 
     #[lua(default)]
     pub stripes: Vec<Stripe>,
 }
 
+impl Animation {
+    fn load_hr_version(value: Value) -> Result<Option<Box<Animation>>, Error> {
+        let animation: Option<Animation> = to_option(value)?;
+        Ok(animation.map(Box::new))
+    }
+}
+
 pub type Animation4Way = FourWay<Animation>;
 
-#[derive(Copy, Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaValue)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum CardinalDirection {
     North,
     East,
@@ -226,6 +213,47 @@ impl From<CardinalDirection> for f32 {
     }
 }
 
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+pub enum Direction {
+    North,
+    NorthEast,
+    East,
+    SouthEast,
+    South,
+    SouthWest,
+    West,
+    NorthWest,
+}
+
+impl Direction {
+    fn to_cardinal(&self) -> Option<CardinalDirection> {
+        match self {
+            Direction::North => Some(CardinalDirection::North),
+            Direction::East => Some(CardinalDirection::East),
+            Direction::South => Some(CardinalDirection::South),
+            Direction::West => Some(CardinalDirection::West),
+            _ => None,
+        }
+    }
+}
+
+impl FromLuaValue for Direction {
+    fn from_lua_value(value: Value) -> Result<Self, Error> {
+        let x = u32::from_lua_value(value)?;
+        match x {
+            0 => Ok(Direction::North),
+            1 => Ok(Direction::NorthEast),
+            2 => Ok(Direction::East),
+            3 => Ok(Direction::SouthEast),
+            4 => Ok(Direction::South),
+            5 => Ok(Direction::SouthWest),
+            6 => Ok(Direction::West),
+            7 => Ok(Direction::NorthWest),
+            _ => Err(Error::other(format!("Expected direction value between 0 and 7, but got {}", x))),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct FourWay<T> {
     pub north: T,
@@ -235,6 +263,15 @@ pub struct FourWay<T> {
 }
 
 impl<T> FourWay<T> {
+    fn new(north: T, east: T, south: T, west: T) -> Self {
+        Self {
+            north,
+            east,
+            south,
+            west,
+        }
+    }
+
     fn get(&self, dir: CardinalDirection) -> &T {
         match dir {
             CardinalDirection::North => &self.north,
@@ -313,7 +350,7 @@ impl FromLuaTable for AnimationVariations {
 
 #[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaTable)]
 pub struct AnimationElement {
-    #[lua(default_with = "RenderLayer::Object")]
+    #[lua(default)]
     render_layer: RenderLayer,
 
     secondary_draw_order: i8,
@@ -532,7 +569,6 @@ pub struct AmmoType {
 }
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaValue)]
-#[serde(rename_all = "lowercase")]
 pub enum TargetType {
     Entity,
     Position,
@@ -690,13 +726,13 @@ pub struct BeaconGraphicsSet {
     #[lua(default)]
     pub module_icons_suppressed: bool,
 
-    #[lua(default_with = "RenderLayer::Object")]
+    #[lua(default)]
     pub base_layer: RenderLayer,
 
-    #[lua(default_with = "RenderLayer::Object")]
+    #[lua(default)]
     pub animation_layer: RenderLayer,
 
-    #[lua(default_with = "RenderLayer::Object")]
+    #[lua(default)]
     pub top_layer: RenderLayer,
 
     #[lua(default_with = "1.")]
@@ -938,23 +974,370 @@ pub struct Effect();
 #[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaTable)]
 pub struct EffectTypeLimitation();
 
-#[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaTable)]
-pub struct Energy();
+#[derive(Clone, Debug, Serialize, Deserialize, From, Into, AsRef, AsMut, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Energy(u64);
+
+#[derive(Debug, Error)]
+#[error("Can't parse energy value: {0}")]
+pub struct EnergyParseError(String);
+
+impl FromStr for Energy {
+    type Err = EnergyParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let err = || EnergyParseError(s.to_owned());
+        let energy_unit_conversion = match &s[s.len() - 1..] {
+            "J" => 1,
+            "W" => 60,
+            _ => return Err(err()),
+        };
+
+        let si_prefix = match &s[s.len() - 2 .. s.len() - 1] {
+            "K" | "k" => 1000,
+            "M" => 1000000,
+            "G" => 1000000000,
+            "T" => 1000000000000,
+            "P" => 1000000000000000,
+            "E" => 1000000000000000000,
+            //"Z" => 1000000000000000000000,
+            //"Y" => 1000000000000000000000000,
+            _ => 1,
+        };
+
+        let n = s.len() - if si_prefix == 1 { 1 } else { 2 };
+        let n: u64 = s[0..n].parse().map_err(|_| err())?;
+
+        Ok(Energy(n * si_prefix / energy_unit_conversion))
+    }
+}
+
+impl FromLuaValue for Energy {
+    fn from_lua_value(value: Value) -> Result<Self, Error> {
+        let s = String::from_lua_value(value)?;
+        s.parse().map_err(Error::other)
+    }
+}
+
+
+
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaValue)]
+pub enum EnergySourceType {
+    Electric,
+    Burner,
+    Heat,
+    Fluid,
+    Void,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct EnergySource {
+    r#type: EnergySourceType,
+
+    emissions_per_minute: f64,
+
+    render_no_power_icon: bool,
+
+    render_no_network_icon: bool,
+
+    specialized: SpecializedEnergySource,
+}
+
+impl FromLuaTable for EnergySource {
+    fn from_lua_table(table: Table) -> Result<Self, Error> {
+        log::debug!("{:?}", rustorio_data::value::Table::from_lua_table(table.clone()));
+
+        let r#type = to_result(table.get::<_, Value>("type")?, || Error::missing_field("type"))?;
+        let emissions_per_minute = to_option(table.get::<_, Value>("emissions_per_minute")?)?.unwrap_or_default();
+        let render_no_power_icon = to_option(table.get::<_, Value>("render_no_power_icon")?)?.unwrap_or(true);
+        let render_no_network_icon = to_option(table.get::<_, Value>("render_no_network_icon")?)?.unwrap_or(true);
+
+        let specialized = match r#type {
+            EnergySourceType::Electric => SpecializedEnergySource::Electric(ElectricEnergySource::from_lua_table(table.clone())?),
+            EnergySourceType::Burner => SpecializedEnergySource::Burner(BurnerEnergySource::from_lua_table(table.clone())?),
+            EnergySourceType::Heat => SpecializedEnergySource::Heat(HeatEnergySource::from_lua_table(table.clone())?),
+            EnergySourceType::Void => SpecializedEnergySource::Void,
+            EnergySourceType::Fluid => SpecializedEnergySource::Fluid(FluidEnergySource::from_lua_table(table.clone())?),
+        };
+
+        Ok(EnergySource {
+            r#type,
+            emissions_per_minute,
+            render_no_power_icon,
+            render_no_network_icon,
+            specialized,
+        })
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum SpecializedEnergySource {
+    Electric(ElectricEnergySource),
+    Burner(BurnerEnergySource),
+    Heat(HeatEnergySource),
+    Void,
+    Fluid(FluidEnergySource),
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaTable)]
-pub struct EnergySource();
+pub struct ElectricEnergySource {
+    #[lua(default)]
+    buffer_capacity: Option<Energy>,
+
+    usage_priority: ElectricUsagePriority,
+
+    #[lua(default)]
+    input_flow_limit: Option<Energy>,
+
+    #[lua(default)]
+    output_flow_limit: Option<Energy>,
+
+    #[lua(default)]
+    drain: Option<Energy>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaValue)]
+pub enum ElectricUsagePriority {
+    PrimaryInput,
+    PrimaryOutput,
+    SecondaryInput,
+    SecondaryOutput,
+    Tertiary,
+    Solar,
+    Lamp,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct BurnerEnergySource {
+    fuel_inventory_size: ItemStackIndex,
+    burnt_inventory_size: ItemStackIndex,
+    smoke: Vec<SmokeSource>,
+    light_flicker: Option<LightFlickeringDefinition>,
+    effectivity: f64,
+    fuel_categories: Vec<PrototypeRef<FuelCategory>>,
+}
+
+impl FromLuaTable for BurnerEnergySource {
+    fn from_lua_table(table: Table) -> Result<Self, Error> {
+        let fuel_categories = if let Some(fuel_category) = to_option(table.get("fuel_category")?)? {
+            vec![fuel_category]
+        }
+        else {
+            to_result(table.get("fuel_categories")?, || Error::missing_field("fuel_categories"))?
+        };
+
+        Ok(Self {
+            fuel_inventory_size: to_result(table.get::<_, Value>("fuel_inventory_size")?, || Error::missing_field("fuel_inventory_size"))?,
+            burnt_inventory_size: to_option(table.get::<_, Value>("burnt_inventory_size")?)?.unwrap_or_default(),
+            smoke: to_option(table.get::<_, Value>("smoke")?)?.unwrap_or_default(),
+            light_flicker: to_option(table.get::<_, Value>("light_flicker")?)?,
+            effectivity: to_option(table.get::<_, Value>("effectivity")?)?.unwrap_or(1.0),
+            fuel_categories,
+        })
+    }
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaTable)]
-pub struct EntityPrototypeFlags();
+pub struct LightFlickeringDefinition {
+    #[lua(default_with="0.2")]
+    minimum_intensity: f32,
+
+    #[lua(default_with="0.8")]
+    maximum_intensity: f32,
+
+    #[lua(default_with="0.3")]
+    derivation_change_frequency: f32,
+
+    #[lua(default_with="0.06")]
+    derivation_change_deviation: f32,
+
+    #[lua(default_with="0.2")]
+    border_fix_speed: f32,
+
+    #[lua(default_with="0.5")]
+    minimum_light_size: f32,
+
+    #[lua(default_with="0.5")]
+    light_intensity_to_size_coefficient: f32,
+
+    #[lua(default_with="Color::new(1., 1., 1., 1.)")]
+    color: Color,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaTable)]
-pub struct EquipmentShape();
+pub struct HeatEnergySource {
+    max_temperature: f64,
+
+    #[lua(default_with="15.0")]
+    default_temperature: f64,
+
+    specific_heat: Energy,
+
+    max_transfer: Energy,
+
+    #[lua(default_with="1.0")]
+    min_temperature_gradient: f64,
+
+    #[lua(default_with="15.0")]
+    min_working_temperature: f64,
+
+    #[lua(default_with="1.0")]
+    minimum_glow_temperature: f64,
+
+    #[lua(default)]
+    pipe_covers: Option<Sprite4Way>,
+
+    #[lua(default)]
+    heat_pipe_covers: Option<Sprite4Way>,
+
+    #[lua(default)]
+    heat_picture: Option<Sprite4Way>,
+
+    #[lua(default)]
+    heat_glow: Option<Sprite4Way>,
+
+    #[lua(default)]
+    connections: Vec<HeatConnection>,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaTable)]
-pub struct FileName();
+pub struct HeatConnection {
+    position: Point2<i32>,
+
+    direction: Direction,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaTable)]
-pub struct FluidBox();
+pub struct FluidEnergySource {
+    fluid_box: FluidBox,
+
+    #[lua(default)]
+    smoke: Vec<SmokeSource>,
+
+    #[lua(default)]
+    light_flicker: Option<LightFlickeringDefinition>,
+
+    #[lua(default_with="1.0")]
+    effectivity: f64,
+
+    #[lua(default_with="true")]
+    burns_fluid: bool,
+
+    #[lua(default)]
+    scale_fluid_usage: bool,
+
+    #[lua(default)]
+    fluid_usage_per_tick: f64,
+
+    #[lua(default)]
+    maximum_temperature: Option<f64>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaValue)]
+pub enum EntityPrototypeFlag {
+    NotRotatable,
+    PlaceablePlayer,
+    PlaceableNeutral,
+    PlaceableEnemy,
+    PlaceableOffGrid,
+    PlayerCreation,
+    BuildingDirection8Way,
+    FilterDirections,
+    FastReplaceableNoBuildWhileMoving,
+    BreathsAir,
+    NotRepairable,
+    NotOnMap,
+    NotBlueprintable,
+    NotDeconstructable,
+    Hidden,
+    HideAltInfo,
+    FastReplaceableNoCrossTypeWhileMoving,
+    NoGapFillWhileBuilding,
+    NotFlammable,
+    NoAutomatedItemRemoval,
+    NoAutomatedItemInsertion,
+    NoCopyPaste,
+    NotSelectableInGame,
+    NotUpgradable,
+    NotInKillStatistic,
+}
+
+pub type EntityPrototypeFlags = Vec<EntityPrototypeFlag>;
+
+#[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaTable)]
+pub struct EquipmentShape {
+    width: u32,
+    height: u32,
+    r#type: EquipmentShapeType,
+    points: Vec<Point2<u32>>,
+}
+
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaValue)]
+pub enum EquipmentShapeType {
+    Full,
+    Manual,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaValue, From, Into, AsRef, AsMut, PartialEq, Eq, Hash, PartialOrd, Ord, Display)]
+pub struct FileName(String);
+
+#[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaTable)]
+pub struct FluidBox {
+    pipe_connections: Vec<PipeConnectionDefinition>,
+
+    #[lua(default_with="1.0")]
+    base_area: f64,
+
+    #[lua(default)]
+    base_level: f64,
+
+    #[lua(default_with="1.0")]
+    height: f64,
+
+    #[lua(default)]
+    filter: Option<PrototypeRef<Fluid>>,
+
+    #[lua(default)]
+    render_layer: RenderLayer,
+
+    #[lua(default)]
+    pipe_covers: Option<Sprite4Way>,
+
+    #[lua(default)]
+    pipe_picture: Option<Sprite4Way>,
+
+    minimum_temperature: f64,
+
+    maximum_temperature: f64,
+
+    #[lua(default)]
+    production_type: Option<ProductionType>,
+
+    #[lua(default_with="1")]
+    secondary_draw_order: i8,
+
+    #[lua(default_with="FourWay::new(1, 1, 1, 1)")]
+    secondary_draw_orders: FourWay<i8>,
+}
+
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaValue)]
+pub enum ProductionType {
+    Input,
+    InputOutput,
+    Output,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaTable)]
+pub struct PipeConnectionDefinition {
+    #[lua(default)]
+    position: Option<Vector2<f32>>,
+    #[lua(default)]
+    positions: Vec<Vector2<f32>>,
+
+    #[lua(default)]
+    max_underground_distance: u32,
+
+    r#type: Option<ProductionType>,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaTable)]
 pub struct FootstepTriggerEffectList();
@@ -965,14 +1348,73 @@ pub struct ForceCondition();
 #[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaTable)]
 pub struct HeatBuffer();
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum IconSpecification {
+    Multiple {
+        icons: Vec<IconData>,
+        icon_size: Option<SpriteSizeType>,
+        icon_mipmaps: u8,
+    },
+    Single {
+        icon: FileName,
+        icon_size: SpriteSizeType,
+        icon_mipmaps: u8,
+    }
+
+}
+
+impl FromLuaTable for IconSpecification {
+    fn from_lua_table(table: Table) -> Result<Self, Error> {
+        if let Some(icon) = to_option(table.get("icon")?)? {
+            let icon_size = to_result(table.get("icon_size")?, || Error::missing_field("icon_size"))?;
+            let icon_mipmaps = to_option(table.get("icon_mipmaps")?)?.unwrap_or_default();
+            Ok(Self::Single {
+                icon,
+                icon_size,
+                icon_mipmaps,
+            })
+        }
+        else {
+            let icons: Vec<IconData> = to_result(table.get("icons")?, || Error::missing_field("icons"))?;
+            if icons.is_empty() {
+                return Err(Error::other("At least one icon must be present"));
+            }
+            let icon_size = to_option(table.get("icon_size")?)?;
+            if !icons.iter().all(|icon| icon.icon_size.is_some()) && icon_size.is_none() {
+                return Err(Error::other("`icon_size` must be set in the `IconSpecification` if it's not set in all `IconData`s"));
+            }
+            let icon_mipmaps = to_option(table.get("icon_mipmaps")?)?.unwrap_or_default();
+            Ok(Self::Multiple {
+                icons,
+                icon_size,
+                icon_mipmaps,
+            })
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaTable)]
-pub struct IconSpecification();
+pub struct IconData {
+    icon: FileName,
+
+    #[lua(default)]
+    icon_size: Option<SpriteSizeType>,
+
+    #[lua(default_with="Color::new(0., 0., 0., 1.)")]
+    tint: Color,
+
+    #[lua(default)]
+    shift: Vector2<f32>,
+
+    #[lua(default_with="1.")]
+    scale: f64,
+
+    #[lua(default)]
+    icon_mipmaps: u8,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaTable)]
 pub struct InterruptibleSound();
-
-#[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaTable)]
-pub struct ItemCountType();
 
 #[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaTable)]
 pub struct ItemProductPrototype();
@@ -980,14 +1422,57 @@ pub struct ItemProductPrototype();
 #[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaTable)]
 pub struct ItemPrototypeFlags();
 
-#[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaTable)]
-pub struct ItemStackIndex();
+pub type ItemStackIndex = u16;
+pub type ItemCountType = u32;
+pub type UnitNumber = u32;
 
 #[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaTable)]
 pub struct LayeredSound();
 
 #[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaTable)]
-pub struct LightDefinition();
+pub struct LightDefinition {
+    #[lua(default)]
+    r#type: LightDefinitionType,
+
+    #[lua(default)]
+    picture: Option<Sprite>,
+
+    #[lua(default)]
+    rotation_shift: Option<RealOrientation>,
+
+    intensity: f32,
+
+    size: f32,
+
+    #[lua(default)]
+    source_orientation_offset: RealOrientation,
+
+    #[lua(default)]
+    add_perspective: bool,
+
+    #[lua(default)]
+    shift: Vector2<f32>,
+
+    #[lua(default)]
+    color: Color,
+
+    #[lua(default)]
+    minimum_darkness: f32,
+}
+
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaValue)]
+pub enum LightDefinitionType {
+    Basic,
+    Oriented
+}
+
+impl Default for LightDefinitionType {
+    fn default() -> Self {
+        Self::Basic
+    }
+}
+
+pub type RealOrientation = f32;
 
 #[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaTable)]
 pub struct LocalisedString();
@@ -1068,6 +1553,12 @@ pub enum RenderLayer {
     Cursor,
 }
 
+impl Default for RenderLayer {
+    fn default() -> Self {
+        RenderLayer::Object
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaTable)]
 pub struct Resistances();
 
@@ -1084,16 +1575,91 @@ pub struct RotatedAnimationVariations();
 pub struct RotatedSprite();
 
 #[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaTable)]
-pub struct SignalIDConnector();
+pub struct SignalIDConnector {
+    r#type: SignalType,
+    name: String,
+}
+
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaValue)]
+pub enum SignalType {
+    Virtual,
+    Item,
+    Fluid
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaTable)]
 pub struct Sound();
 
 #[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaTable)]
-pub struct Sprite();
+pub struct Sprite {
+    #[lua(default)]
+    filename: Option<FileName>,
 
-#[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaTable)]
-pub struct Sprite4Way();
+    /// If this property is present, all Sprite definitions have to be placed as entries in the array, and they will all be loaded from there. Each item (Sprite definition) in the array may also have the layers property.
+    ///
+    /// If this property is present, all other properties are ignored and the mandatory properties do not have to be defined.
+    ///
+    /// Layers may not be an empty table.
+    #[lua(default)]
+    layers: Option<Vec<Sprite>>,
+
+    #[lua(with="Sprite::load_hr_version")]
+    hr_version: Option<Box<Sprite>>,
+
+    #[lua(default)]
+    pub priority: SpritePriority,
+
+    #[lua(default)]
+    pub flags: SpriteFlags,
+
+    #[lua(with_context="size_from_fields")]
+    pub size: Vector2<SpriteSizeType>,
+
+    #[lua(with_context="position_from_fields", default)]
+    pub position: Vector2<SpriteSizeType>,
+
+    #[lua(default)]
+    pub shift: Vector2<f32>,
+
+    #[lua(default)]
+    pub scale: f64,
+
+    #[lua(default)]
+    pub draw_as_shadow: bool,
+
+    #[lua(default)]
+    pub mipmap_count: u8,
+
+    #[lua(default)]
+    pub apply_runtime_tint: bool,
+
+    #[lua(default_with="Color::new(1., 1., 1., 1.)")]
+    pub tint: Color,
+
+    #[lua(default)]
+    pub blend_mode: BlendMode,
+
+    #[lua(default)]
+    pub load_in_minimal_mode: bool,
+
+    #[lua(default_with = "true")]
+    pub premul_alpha: bool,
+
+    #[lua(default)]
+    pub generate_sdf: bool,
+
+    #[lua(with_context="dice_from_fields")]
+    pub dice: Vector2<SpriteSizeType>,
+}
+
+impl Sprite {
+    fn load_hr_version(value: Value) -> Result<Option<Box<Sprite>>, Error> {
+        let sprite: Option<Sprite> = to_option(value)?;
+        Ok(sprite.map(Box::new))
+    }
+}
+
+pub type Sprite4Way = FourWay<Sprite>;
 
 #[derive(Clone, Debug, Error, Deserialize)]
 #[error("Error while parsing SpriteFlag: {0}")]
@@ -1252,7 +1818,6 @@ pub enum SpriteGroup {
 pub struct SpriteFlags(Vec<SpriteFlag>);
 
 #[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaValue)]
-#[serde(rename_all = "kebab-case")]
 pub enum SpritePriority {
     ExtraHighNoScale,
     ExtraHigh,
@@ -1297,7 +1862,20 @@ pub struct UnitAISettings();
 pub struct WaterReflectionDefinition();
 
 #[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaTable)]
-pub struct WireConnectionPoint();
+pub struct WireConnectionPoint {
+    wire: WirePosition,
+    shadow: WirePosition,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaTable)]
+pub struct WirePosition {
+    #[lua(default)]
+    copper: Option<Vector2<f32>>,
+    #[lua(default)]
+    red: Option<Vector2<f32>>,
+    #[lua(default)]
+    green: Option<Vector2<f32>>,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, rustorio_data_derive::FromLuaTable)]
 pub struct WorkingSound();

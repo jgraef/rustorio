@@ -15,10 +15,10 @@ use serde::Deserialize;
 use thiserror::Error;
 
 use rustorio_proptree::Value as PropertyTree;
-use rustorio_data::value::Value;
 
 use crate::{error::Error, lua_utils, version::Version};
-use std::convert::TryInto;
+use rustorio_data::FromLuaValue;
+
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct InfoJson {
@@ -464,7 +464,7 @@ impl ModLoader {
         Ok(())
     }
 
-    pub fn data_stage(&mut self) -> Result<Value, Error> {
+    pub fn data_stage<T: FromLuaValue>(&mut self) -> Result<T, Error> {
         let mut lua = unsafe { Lua::unsafe_new() };
 
         if self.mods_sorted.is_empty() {
@@ -492,7 +492,8 @@ impl ModLoader {
         self.run_with_all(&mut lua, "data-final-fixes.lua")?;
 
         let data_raw = lua_utils::get_data_raw(&lua)?;
-        Ok(data_raw.try_into()?)
+
+        Ok(T::from_lua_value(data_raw)?)
     }
 }
 
@@ -541,7 +542,7 @@ mod tests {
         //mod_loader.settings_stage().unwrap();
 
         log::info!("Data stage...");
-        mod_loader.data_stage().unwrap();
+        mod_loader.data_stage::<rustorio_data::value::Value>().unwrap();
     }
 
     #[test]

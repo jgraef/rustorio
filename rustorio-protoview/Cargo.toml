@@ -11,5 +11,5 @@ pretty_env_logger = "0.4"
 cursive = "0.14"
 cursive_tree_view = "0.6"
 
-rustorio-core = { path = "../rustorio-core" }
+rustorio-core = { path = "../rustorio-core", features = ["prototypes"] }
 rustorio-data = { path = "../rustorio-data" }

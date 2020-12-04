@@ -1,6 +1,5 @@
 use std::{
     collections::btree_map::{BTreeMap, Iter},
-    convert::{TryFrom, TryInto},
     fmt::{self, Debug, Formatter},
     iter::FromIterator,
 };
@@ -9,7 +8,7 @@ use derive_more::{From, Into, AsRef, AsMut, IntoIterator};
 #[cfg(feature="serde")]
 use serde::{Deserialize, Serialize};
 
-use super::{FromLuaValue, Error};
+use super::{FromLuaValue, FromLuaTable, Error};
 
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
@@ -69,10 +68,8 @@ impl From<String> for Key {
     }
 }
 
-impl TryFrom<mlua::Value<'_>> for Key {
-    type Error = Error;
-
-    fn try_from(value: mlua::Value) -> Result<Self, Self::Error> {
+impl FromLuaValue for Key {
+    fn from_lua_value(value: mlua::Value) -> Result<Self, Error> {
         match value {
             mlua::Value::Nil => Ok(Key::Nil),
             mlua::Value::Boolean(b) => Ok(Key::Boolean(b)),
@@ -126,16 +123,14 @@ impl FromIterator<(Key, Value)> for Table {
     }
 }
 
-impl TryFrom<mlua::Table<'_>> for Table {
-    type Error = Error;
-
-    fn try_from(table: mlua::Table) -> Result<Self, Self::Error> {
+impl FromLuaTable for Table {
+    fn from_lua_table(table: mlua::Table) -> Result<Self, Error> {
         let mut t = BTreeMap::new();
 
         for r in table.pairs::<mlua::Value, mlua::Value>() {
             let (k, v) = r?;
 
-            t.insert(k.try_into()?, v.try_into()?);
+            t.insert(Key::from_lua_value(k)?, Value::from_lua_value(v)?);
         }
 
         Ok(Table(t))
@@ -233,30 +228,16 @@ impl Debug for Value {
     }
 }
 
-impl TryFrom<mlua::Value<'_>> for Value {
-    type Error = Error;
-
-    fn try_from(value: mlua::Value) -> Result<Self, Self::Error> {
+impl FromLuaValue for Value {
+    fn from_lua_value(value: mlua::Value) -> Result<Self, Error> {
         match value {
             mlua::Value::Nil => Ok(Value::Nil),
             mlua::Value::Boolean(x) => Ok(Value::Boolean(x)),
             mlua::Value::Integer(x) => Ok(Value::Integer(x)),
             mlua::Value::Number(x) => Ok(Value::Number(x)),
             mlua::Value::String(x) => Ok(Value::String(x.to_str()?.to_owned())),
-            mlua::Value::Table(x) => Ok(Value::Table(x.try_into()?)),
+            mlua::Value::Table(x) => Ok(Value::Table(Table::from_lua_table(x)?)),
             x => Err(Error::inconvertible(x)),
         }
-    }
-}
-
-impl FromLuaValue for Value {
-    fn from_lua_value(value: mlua::Value) -> Result<Self, Error> {
-        Value::try_from(value)
-    }
-}
-
-impl FromLuaValue for Key {
-    fn from_lua_value(value: mlua::Value) -> Result<Self, Error> {
-        Key::try_from(value)
     }
 }

@@ -56,7 +56,7 @@ impl PrototypeTree {
     }
 
     fn fill_children(&mut self, table: Table, parent: usize, depth: usize) {
-        if depth > 3 {
+        if depth > 4 {
             return;
         }
 
@@ -104,7 +104,7 @@ fn main() -> Result<(), Error> {
     let mut loader = ModLoader::new_with_base("data/core", "data/base")?;
     loader.check_dependencies()?;
 
-    let data_raw = loader.data_stage()?;
+    let data_raw: Value = loader.data_stage()?;
 
     /*let data_raw = Value::Table(
         vec![

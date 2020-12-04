@@ -110,3 +110,10 @@ with open("prototypes/type_stubs.rs", "wt") as f:
 pub struct {}();
 
 """.format(ty))
+
+
+with open("prototypes/visitor.rs", "wt") as f:
+    for proto in prototypes:
+        method_name = re.sub(r'(?<!^)(?=[A-Z])', '_', proto["class_name"]).lower()
+        f.write("fn visit_{}(&self, _{}: &{}::{}) -> Self::Output {{}}\n".format(method_name, method_name, method_name, proto["class_name"]))
+

@@ -15,7 +15,7 @@ use std::{
     fmt::Display,
 };
 
-use mlua::{Value, Table};
+pub use mlua::{Value, Table};
 use thiserror::Error;
 
 
@@ -126,6 +126,7 @@ impl FromLuaValue for f64 {
     fn from_lua_value(value: Value) -> Result<Self, Error> {
         match value {
             Value::Number(x) => Ok(x),
+            Value::Integer(x) => Ok(x as f64),
             x => Err(Error::unexpected(x)),
         }
     }
