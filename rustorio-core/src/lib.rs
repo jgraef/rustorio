@@ -8,10 +8,11 @@ pub mod lua_utils;
 pub mod mod_loader;
 pub mod version;
 
-#[cfg(feature="prototypes")]
+// TODO: Split up types, such that it can be used without prototypes
+//#[cfg(feature="prototypes")]
 pub mod types;
 
-#[cfg(feature="prototypes")]
+//#[cfg(feature="prototypes")]
 pub mod prototypes;
 
 #[cfg(feature="blueprint")]

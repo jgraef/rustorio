@@ -1,15 +1,15 @@
 
 
 mod diode_rename<$out, $in> {
-    port <in_red, in_green>;
-    port <in_red, in_green>;
+    port input: <in_red, in_green>;
+    port output: <in_red, in_green>;
 
-    <out_red, out_green>[$out] <- <in_red, in_green>[$in] + 0;
+    (out_red, out_green)[$out] <- (in_red, in_green)[$in] + 0;
 }
 
 mod clock<#n> {
-    port red ce, green _;
-    port red t, green _;
+    port clock_enable(red ce, _);
+    port time(red t, green _);
 
     wire green tmp;
 
@@ -17,8 +17,8 @@ mod clock<#n> {
     tmp[virtual-C] <- if ce[virtual-E] > 0 then 1;
 
     //Pass through C from tmp to tmp if C < (constant) N;
-    tmp[_] <- if tmp[virtual-C] < #n then _;
+    tmp[virtual-C] <- if tmp[virtual-C] < #n then _;
 
     // Output diode, probably unnecessary
-    t <- diode_rename<virtual-T, virtual-C>(t, C);
+    t <- diode_rename<virtual-T, virtual-C>(input: t, output: C);
 }

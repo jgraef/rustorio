@@ -1,0 +1,129 @@
+use std::str::FromStr;
+use crate::{
+    parser::ast::{
+        ModDecl, ModBody, GenericDecl, PortDecl, WireDecl, Statement, WireColor, Ident, Input, Output, Signal,
+        DeciderMode, SignalConst, Wires, GenericArg, PortDef,
+    },
+    ir::{DeciderOp, ArithmeticOp},
+};
+
+
+grammar;
+
+
+
+
+
+pub ModDecl: ModDecl = {
+    "mod" <ident:Ident> <generics:("<" <Comma<GenericDecl>> ">")?> "{" <body:ModBody> "}" => ModDecl { <> },
+}
+
+pub ModBody: ModBody = {
+    <ports:(<PortDecl> ";")*> <wires:(<WireDecl> ";")*> <statements:(<Statement> ";")*> => ModBody { <> },
+}
+
+pub GenericDecl: GenericDecl = {
+    "#" <Ident> => GenericDecl::Num(<>),
+    "$" <Ident> => GenericDecl::SignalID(<>),
+}
+
+pub PortDecl: PortDecl = {
+    "port" <ident:Ident> "(" "red"? <red:Ident> "," "green"? <green:Ident> ")" => PortDecl::Both { <> },
+    "port" <ident:Ident> <color:WireColor> => PortDecl::ShortHand { <> },
+}
+
+pub WireDecl: WireDecl = {
+    "wire" <color:WireColor> <ident:Ident> => WireDecl { <> },
+}
+
+pub Statement: Statement = {
+    <output:Output> "<-" "{" <constants:(<SignalConst> ";")*> "}" => Statement::Constant { <> },
+    <output:Output> "<-" "if" <left:Input> <op:DeciderOp> <right:Input> "then" <mode:DeciderMode> => Statement::Decider { <> },
+    <output:Output> "<-" <left:Input> <op:ArithmeticOp> <right:Input> => Statement::Arithmetic { <> },
+    <output:Output> "<-" <ident:Ident> <generics:("<" <Comma<GenericArg>> ">")?> "(" <ports:Comma<PortDef>> ")" => Statement::ModuleInst { <> },
+}
+
+pub PortDef: PortDef = {
+    <port: Ident> ":" <wire: Ident> => PortDef { <> },
+}
+
+pub GenericArg: GenericArg = {
+    "#" <Ident> => GenericArg::NumVar(<>),
+    <Num> => GenericArg::NumConst(<>),
+    "$" <Ident> => GenericArg::SignalVar(<>),
+    <Ident> => GenericArg::SignalConst(<>),
+}
+
+
+pub SignalConst: SignalConst = {
+    <signal:Ident> "=" <constant:Num> => SignalConst { <> },
+}
+
+pub Output: Output = {
+    <wires:Wires> <signal:("[" <Signal> "]")?> => Output { <> },
+}
+
+pub Input: Input = {
+    <wires:Wires> <signal:("[" <Signal> "]")?> => Input::Signal { <> },
+    <Num> => Input::Constant(<>),
+    "#" <Ident> => Input::GenericArg(<>),
+}
+
+pub Wires: Wires = {
+    <ident:Ident> => Wires::Single(ident),
+    "(" <red:Ident> "," <green:Ident> ")" => Wires::Both { <> },
+}
+
+pub Signal: Signal = {
+    "all" => Signal::All,
+    "any" => Signal::Any,
+    "for" => Signal::ForEach,
+    <Ident> => Signal::Ident(<>),
+}
+
+pub DeciderOp: DeciderOp = {
+    ">=" => DeciderOp::GreaterEqual,
+    "<=" => DeciderOp::LessEqual,
+    ">" => DeciderOp::GreaterThan,
+    "<" => DeciderOp::LessThan,
+    "==" => DeciderOp::Equal,
+    "!=" => DeciderOp::NotEqual,
+}
+
+pub ArithmeticOp: ArithmeticOp = {
+    "*" => ArithmeticOp::Multiply,
+    "/" => ArithmeticOp::Divide,
+    "+" => ArithmeticOp::Add,
+    "-" => ArithmeticOp::Subtract,
+    "%" => ArithmeticOp::Modulo,
+    "**" => ArithmeticOp::Power,
+    "<<" => ArithmeticOp::LeftShift,
+    ">>" => ArithmeticOp::RightShift,
+    "&" => ArithmeticOp::BitwiseAnd,
+    "|" => ArithmeticOp::BitwiseOr,
+    "^" => ArithmeticOp::BitwiseXor,
+}
+
+pub DeciderMode: DeciderMode = {
+    "1" => DeciderMode::One,
+    <ident:Ident> => DeciderMode::Input(ident),
+}
+
+pub WireColor: WireColor = {
+    "red" => WireColor::Red,
+    "green" => WireColor::Green,
+}
+
+Comma<T>: Vec<T> = {
+    <v:(<T> ",")*> <e:T?> => match e {
+        None => v,
+        Some(e) => {
+            let mut v = v;
+            v.push(e);
+            v
+        }
+    }
+};
+
+pub Num: i32 = r"[0-9]+" => i32::from_str(<>).unwrap();
+pub Ident: Ident = r"[_a-zA-Z][_\-a-zA-Z0-9]*" => Ident::from(<>);
