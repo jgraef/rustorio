@@ -17,6 +17,7 @@ use crate::blueprint::Error;
 
 
 lazy_static! {
+    // TODO Where does this format come from?
     static ref SIGNAL_REGEX: Regex = Regex::new(r"([a-z0-9-]+)=([a-z0-9-]+):(\d+)").unwrap();
 }
 
@@ -80,10 +81,32 @@ pub enum SignalType {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct SignalID {
-    pub name: String,
     pub r#type: SignalType,
+    pub name: String,
 }
 
+#[derive(Debug, Error)]
+#[error("Invalid signal: {0}")]
+pub struct SignalIDParseError(String);
+
+impl FromStr for SignalID {
+    type Err = SignalIDParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let e = || SignalIDParseError(s.to_owned());
+
+        let mut parts = s.splitn(2, '-');
+        let r#type = parts.next().unwrap().parse().map_err(|_| e())?;
+        let name = parts.next().ok_or_else(e)?.to_owned();
+
+        Ok(Self {
+            r#type,
+            name,
+        })
+    }
+}
+
+// TODO: Isn't that the same as when we derive Ord?
 impl Ord for SignalID {
     fn cmp(&self, other: &Self) -> Ordering {
         self.r#type.cmp(&other.r#type)
@@ -98,23 +121,23 @@ impl PartialOrd for SignalID {
 }
 
 impl SignalID {
-    pub fn new(name: String, r#type: SignalType) -> Self {
+    pub fn new(r#type: SignalType, name: String) -> Self {
         Self {
-            name,
             r#type,
+            name,
         }
     }
 
     pub fn new_item(name: String) -> Self {
-        Self::new(name, SignalType::Item)
+        Self::new(SignalType::Item, name)
     }
 
     pub fn new_fluid(name: String) -> Self {
-        Self::new(name, SignalType::Fluid)
+        Self::new(SignalType::Fluid, name)
     }
 
     pub fn new_virtual(name: String) -> Self {
-        Self::new(name, SignalType::Virtual)
+        Self::new(SignalType::Virtual, name)
     }
 
     pub fn from_letter(c: char) -> Self {
@@ -123,8 +146,8 @@ impl SignalID {
 
     pub fn into_signal(self, count: i32) -> Signal {
         Signal {
-            name: self.name,
             r#type: self.r#type,
+            name: self.name,
             count,
         }
     }
@@ -144,8 +167,8 @@ pub enum SignalParseError {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Signal {
-    pub name: String,
     pub r#type: SignalType,
+    pub name: String,
     pub count: i32,
 }
 
@@ -169,24 +192,24 @@ impl FromStr for Signal {
 }
 
 impl Signal {
-    pub fn new(name: String, r#type: SignalType, count: i32) -> Self {
+    pub fn new(r#type: SignalType, name: String, count: i32) -> Self {
         Self {
-            name,
             r#type,
+            name,
             count
         }
     }
 
     pub fn new_item(name: String, count: i32) -> Self {
-        Self::new(name, SignalType::Item, count)
+        Self::new(SignalType::Item, name, count)
     }
 
     pub fn new_fluid(name: String, count: i32) -> Self {
-        Self::new(name, SignalType::Fluid, count)
+        Self::new(SignalType::Fluid, name, count)
     }
 
     pub fn new_virtual(name: String, count: i32) -> Self {
-        Self::new(name, SignalType::Virtual, count)
+        Self::new(SignalType::Virtual, name, count)
     }
 
     pub fn into_signal(self) -> SignalID {

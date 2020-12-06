@@ -1,0 +1,11 @@
+
+mod clock {
+    port red clock_enable;
+    port red tick;
+
+    wire green tmp;
+
+    tmp[virtual-C] <- if clock_enable[virtual-E] > 0 then 1;
+
+    (tick, tmp)[virtual-C] <- if tmp[virtual-C] < 60 then _;
+}

@@ -522,7 +522,7 @@ mod tests {
 
     #[test]
     fn it_loads_base_mod() {
-        let base_mod = Mod::open("data/base").unwrap();
+        let base_mod = Mod::open("../data/base").unwrap();
         assert_eq!(base_mod.name(), "base");
     }
 
@@ -530,7 +530,9 @@ mod tests {
     fn it_loads_mods() {
         pretty_env_logger::init();
 
-        let mut mod_loader = ModLoader::new_full("data/core", "data/base", "data/mods").unwrap();
+        let mut mod_loader = ModLoader::new_full("../data/core", "../data/base", "../data/mods").unwrap();
+        mod_loader.check_dependencies().unwrap();
+
         let mods = mod_loader.mods().collect::<Vec<Arc<Mod>>>();
 
         log::info!("Mods found");
@@ -550,7 +552,7 @@ mod tests {
 
     #[test]
     fn it_loads_mod_settings() {
-        let mod_settings = ModSettings::read_from_file("data/mods/mod-settings.dat").unwrap();
+        let mod_settings = ModSettings::read_from_file("../data/mods/mod-settings.dat").unwrap();
 
         log::debug!("Mod settings: {:#?}", mod_settings);
     }

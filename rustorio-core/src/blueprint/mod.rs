@@ -255,7 +255,7 @@ impl ControlBehavior {
             .unwrap_or_default();
 
         self.filters.push(SignalFilter {
-            signal: SignalID::new(signal.name, signal.r#type),
+            signal: SignalID::new(signal.r#type, signal.name),
             count: signal.count,
             index: last_index + 1,
         });

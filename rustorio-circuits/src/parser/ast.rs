@@ -1,33 +1,62 @@
+use std::{
+    path::PathBuf,
+    fmt::{self, Display, Formatter},
+};
+
 use derive_more::{From, Into, AsRef, AsMut, Display};
 
 use crate::ir;
 
 
+#[derive(Clone, Debug)]
+pub struct Unit {
+    pub imports: Vec<ImportPath>,
+    pub modules: Vec<ModDecl>,
 
-/*pub enum Wire {
-    Red,
-    Green,
-    Anonymous,
+    pub file_path: Option<PathBuf>,
+    pub source: Option<String>,
 }
 
-pub enum Signal {
-    Everything,
-    Anything,
-    ForEach
-    Constant(i32),
-    Signal(SignalID),
-    Anonymous,
+impl Unit {
+    pub fn new(imports: Vec<ImportPath>, modules: Vec<ModDecl>) -> Self {
+        Self {
+            imports,
+            modules,
+            file_path: None,
+            source: None,
+        }
+    }
 }
 
-pub struct WireSignal {
-    wire: Wire,
-    signal: Signal,
+#[derive(Clone, Debug)]
+pub struct ImportPath(pub Vec<Ident>);
+
+impl ImportPath {
+    pub fn as_path(&self) -> PathBuf {
+        let mut p = PathBuf::new();
+
+        for ident in &self.0 {
+            p.push(&ident.0);
+        }
+
+        p
+    }
 }
 
-pub struct SignalConst {
-    signal: SignalID,
-    constant: i32,
-}*/
+impl Display for ImportPath {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let mut it = self.0.iter();
+
+        // NOTE: Paths can't be empty
+        write!(f, "{}", it.next().unwrap())?;
+
+        while let Some(ident) = it.next() {
+            write!(f, ".{}", ident)?;
+        }
+
+        Ok(())
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct ModDecl {
@@ -58,14 +87,13 @@ pub enum PortDecl {
     },
     ShortHand {
         ident: Ident,
-        color: WireColor,
-        //wire: Ident,
+        color: ir::WireColor,
     },
 }
 
 #[derive(Clone, Debug)]
 pub struct WireDecl {
-    pub color: WireColor,
+    pub color: ir::WireColor,
     pub ident: Ident,
 }
 
@@ -74,6 +102,7 @@ pub enum Statement {
     Constant {
         output: Output, // Must be wires only
         constants: Vec<SignalConst>,
+        disabled: bool,
     },
     Arithmetic {
         output: Output,
@@ -89,17 +118,10 @@ pub enum Statement {
         mode: DeciderMode,
     },
     ModuleInst {
-        output: Output,
         ident: Ident,
         generics: Option<Vec<GenericArg>>,
         ports: Vec<PortDef>,
     }
-}
-
-#[derive(Clone, Debug)]
-pub struct SignalConst {
-    pub signal: Ident,
-    pub constant: i32,
 }
 
 #[derive(Clone, Debug)]
@@ -133,18 +155,13 @@ pub enum Signal {
     Any,
     ForEach,
     Ident(Ident),
+    GenericArg(Ident),
 }
 
 #[derive(Clone, Debug)]
 pub enum DeciderMode {
     One,
     Input(Ident),
-}
-
-#[derive(Clone, Debug)]
-pub enum WireColor {
-    Red,
-    Green
 }
 
 #[derive(Clone, Debug)]
@@ -161,6 +178,12 @@ pub struct PortDef {
     pub wire: Ident,
 }
 
+#[derive(Clone, Debug)]
+pub struct SignalConst {
+    pub ident: Ident,
+    pub constant: i32,
+}
+
 #[derive(Clone, Debug, From, Into, AsRef, AsMut, Display, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Ident(String);
 
@@ -170,4 +193,8 @@ impl From<&str> for Ident {
     }
 }
 
-
+impl Ident {
+    pub fn is_placeholder(&self) -> bool {
+        self.0 == "_"
+    }
+}

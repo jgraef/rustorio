@@ -12,7 +12,7 @@ async fn main() -> Result<(), Error> {
 
     // Connect using environment variables `RCON_ADDRESS` and `RCON_PASSWORD`
     // Alternatively use `RemoteIO::connect(hostname, password)`.
-    let mut remote = FactorioRemote::connect_env().await?;
+    let remote = FactorioRemote::connect_env().await?;
 
 
     let mut train_schedule = TrainSchedule::default();

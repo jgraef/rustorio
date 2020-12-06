@@ -16,6 +16,7 @@ use tokio::{
 use log::Level;
 
 use factorio_data::types::{ChannelId, Color, SignalID, Signal, TrainSchedule, UnitNumber, RadarData, Position, Screenshot};
+pub use factorio_data::types;
 
 use crate::{
     error::Error,

@@ -106,6 +106,44 @@ fn main() -> Result<(), Error> {
 
     let data_raw: Value = loader.data_stage()?;
 
+    /* TODO: Remove again. I just botched this to export all signals
+    match &data_raw {
+        Value::Table(table) => {
+            for (k, v) in table.iter() {
+                let ty = match k {
+                    Key::String(s) => s,
+                    _ => panic!(),
+                };
+
+                match v {
+                    Value::Table(table) => {
+                        if ty == "item" || ty == "fluid" || ty == "virtual-signal" {
+                            let ty = match ty.as_str() {
+                                "item" => "SignalType::Item",
+                                "fluid" => "SignalType::Fluid",
+                                "virtual-signal" => "SignalType::Virtual",
+                                _ => panic!(),
+                            };
+
+                            for (k2, _) in table.iter() {
+                                let name = match k2 {
+                                    Key::String(s) => s,
+                                    _ => panic!(),
+                                };
+
+                                println!("SignalID::new({}, {:?}.to_owned()),", ty, name);
+                            }
+                        }
+                    },
+                    _ => {},
+                }
+            }
+        }
+        _ => {},
+    }
+    panic!("foo");
+    */
+
     /*let data_raw = Value::Table(
         vec![
             (Key::String("1st_child".to_owned()), Value::Nil),

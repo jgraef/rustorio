@@ -2,6 +2,7 @@ use std::{
     collections::btree_map::{BTreeMap, Iter},
     fmt::{self, Debug, Formatter},
     iter::FromIterator,
+    hash::{Hash, Hasher},
 };
 
 use derive_more::{From, Into, AsRef, AsMut, IntoIterator};
@@ -30,7 +31,7 @@ impl Type {
     }
 }
 
-#[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature="serde", derive(Serialize, Deserialize))]
 pub enum Key {
     Nil,
@@ -47,6 +48,68 @@ impl Key {
             Key::Integer(_) => Type::Integer,
             Key::String(_) => Type::String,
         }
+    }
+}
+
+impl PartialEq<()> for Key {
+    fn eq(&self, _: &()) -> bool {
+        match self {
+            Key::Nil => true,
+            _ => false,
+        }
+    }
+}
+
+impl PartialEq<bool> for Key {
+    fn eq(&self, other: &bool) -> bool {
+        match self {
+            Key::Boolean(x) => x == other,
+            _ => false,
+        }
+    }
+}
+
+impl PartialEq<i64> for Key {
+    fn eq(&self, other: &i64) -> bool {
+        match self {
+            Key::Integer(x) => x == other,
+            _ => false,
+        }
+    }
+}
+
+impl PartialEq<String> for Key {
+    fn eq(&self, other: &String) -> bool {
+        match self {
+            Key::String(x) => x == other,
+            _ => false,
+        }
+    }
+}
+
+impl PartialEq<str> for Key {
+    fn eq(&self, other: &str) -> bool {
+        match self {
+            Key::String(x) => x == other,
+            _ => false,
+        }
+    }
+}
+
+impl Hash for Key {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            Key::Nil => Hash::hash(&(), state),
+            Key::Boolean(x) => Hash::hash(&x, state),
+            Key::Integer(x) => Hash::hash(&x, state),
+            Key::String(x) => Hash::hash(&x, state),
+        }
+    }
+}
+
+impl From<()> for Key {
+    fn from(_: ()) -> Self {
+        Self::Nil
     }
 }
 

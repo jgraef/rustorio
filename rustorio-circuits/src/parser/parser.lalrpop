@@ -1,21 +1,23 @@
 use std::str::FromStr;
 use crate::{
     parser::ast::{
-        ModDecl, ModBody, GenericDecl, PortDecl, WireDecl, Statement, WireColor, Ident, Input, Output, Signal,
-        DeciderMode, SignalConst, Wires, GenericArg, PortDef,
+        ModDecl, ModBody, GenericDecl, PortDecl, WireDecl, Statement, Ident, Input, Output,
+        DeciderMode, Wires, GenericArg, PortDef, Unit, ImportPath, SignalConst, Signal,
     },
-    ir::{DeciderOp, ArithmeticOp},
+    ir::{ArithmeticOp, DeciderOp, WireColor},
 };
 
 
 grammar;
 
 
-
+pub Unit: Unit = {
+    <imports:Import*> <modules:ModDecl*> => Unit::new(<>),
+}
 
 
 pub ModDecl: ModDecl = {
-    "mod" <ident:Ident> <generics:("<" <Comma<GenericDecl>> ">")?> "{" <body:ModBody> "}" => ModDecl { <> },
+    "mod" <ident:Ident> <generics:("<" <CommaSeperated<GenericDecl>> ">")?> "{" <body:ModBody> "}" => ModDecl { <> },
 }
 
 pub ModBody: ModBody = {
@@ -29,7 +31,7 @@ pub GenericDecl: GenericDecl = {
 
 pub PortDecl: PortDecl = {
     "port" <ident:Ident> "(" "red"? <red:Ident> "," "green"? <green:Ident> ")" => PortDecl::Both { <> },
-    "port" <ident:Ident> <color:WireColor> => PortDecl::ShortHand { <> },
+    "port" <color:WireColor> <ident:Ident> => PortDecl::ShortHand { <> },
 }
 
 pub WireDecl: WireDecl = {
@@ -37,10 +39,10 @@ pub WireDecl: WireDecl = {
 }
 
 pub Statement: Statement = {
-    <output:Output> "<-" "{" <constants:(<SignalConst> ";")*> "}" => Statement::Constant { <> },
+    <output:Output> "<-" <disabled:"off"?> "{" <constants:(<SignalConst> ";")*> "}" => Statement::Constant { disabled: disabled.is_some(), constants, output },
     <output:Output> "<-" "if" <left:Input> <op:DeciderOp> <right:Input> "then" <mode:DeciderMode> => Statement::Decider { <> },
     <output:Output> "<-" <left:Input> <op:ArithmeticOp> <right:Input> => Statement::Arithmetic { <> },
-    <output:Output> "<-" <ident:Ident> <generics:("<" <Comma<GenericArg>> ">")?> "(" <ports:Comma<PortDef>> ")" => Statement::ModuleInst { <> },
+    "new" <ident:Ident> <generics:("<" <CommaSeperated<GenericArg>> ">")?> "(" <ports:CommaSeperated<PortDef>> ")" => Statement::ModuleInst { <> },
 }
 
 pub PortDef: PortDef = {
@@ -49,14 +51,14 @@ pub PortDef: PortDef = {
 
 pub GenericArg: GenericArg = {
     "#" <Ident> => GenericArg::NumVar(<>),
-    <Num> => GenericArg::NumConst(<>),
+    <Num> => GenericArg::NumConst(<>), // TODO: Allow const expressions
     "$" <Ident> => GenericArg::SignalVar(<>),
     <Ident> => GenericArg::SignalConst(<>),
 }
 
 
 pub SignalConst: SignalConst = {
-    <signal:Ident> "=" <constant:Num> => SignalConst { <> },
+    <ident:Ident> "=" <constant:Num> => SignalConst { <> },
 }
 
 pub Output: Output = {
@@ -79,6 +81,7 @@ pub Signal: Signal = {
     "any" => Signal::Any,
     "for" => Signal::ForEach,
     <Ident> => Signal::Ident(<>),
+    "$" <Ident> => Signal::GenericArg(<>),
 }
 
 pub DeciderOp: DeciderOp = {
@@ -114,8 +117,8 @@ pub WireColor: WireColor = {
     "green" => WireColor::Green,
 }
 
-Comma<T>: Vec<T> = {
-    <v:(<T> ",")*> <e:T?> => match e {
+Seperated<T, S>: Vec<T> = {
+    <v:(<T> S)*> <e:T?> => match e {
         None => v,
         Some(e) => {
             let mut v = v;
@@ -124,6 +127,13 @@ Comma<T>: Vec<T> = {
         }
     }
 };
+
+CommaSeperated<T>: Vec<T> = Seperated<T, ",">;
+DotSeperated<T>: Vec<T> = Seperated<T, ".">;
+
+Import: ImportPath = {
+    "import" <path:DotSeperated<Ident>> ";" => ImportPath(<>),
+}
 
 pub Num: i32 = r"[0-9]+" => i32::from_str(<>).unwrap();
 pub Ident: Ident = r"[_a-zA-Z][_\-a-zA-Z0-9]*" => Ident::from(<>);
