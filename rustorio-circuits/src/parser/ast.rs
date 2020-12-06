@@ -33,13 +33,21 @@ pub struct ImportPath(pub Vec<Ident>);
 
 impl ImportPath {
     pub fn as_path(&self) -> PathBuf {
-        let mut p = PathBuf::new();
+        let mut it = self.0.iter().peekable();
+        let mut path = PathBuf::new();
 
-        for ident in &self.0 {
-            p.push(&ident.0);
+        while let Some(ident) = it.next() {
+            let path_segment = &ident.0;
+
+            if it.peek().is_none() {
+                path.push(format!("{}.fc", path_segment));
+            }
+            else {
+                path.push(&ident.0);
+            }
         }
 
-        p
+        path
     }
 }
 
