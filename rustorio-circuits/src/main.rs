@@ -1,9 +1,9 @@
-pub mod component;
 pub mod ir;
 pub mod parser;
 pub mod compiler;
 //pub mod simulator;
 pub mod signals;
+pub mod blueprint;
 
 use std::{
     path::{PathBuf, Path},
@@ -13,6 +13,8 @@ use std::{
 
 use structopt::StructOpt;
 use anyhow::Error;
+
+use rustorio_core::blueprint::Envelope;
 
 use crate::{
     parser::{ParserConfig, Parser},
@@ -64,6 +66,11 @@ fn compile_to_ir(inputs: Vec<PathBuf>, mut imports: Vec<PathBuf>, root: String) 
     let ir = compiler.compile_module(&root.into(), vec![])?;
 
     log::debug!("IR: {:#?}", ir);
+
+    let blueprint = crate::blueprint::blueprint_from_ir(&ir)?;
+
+    log::debug!("Blueprint: {:#?}", blueprint);
+    log::debug!("Blueprint: {}", Envelope::Blueprint(blueprint).encode()?);
 
     Ok(ir)
 }

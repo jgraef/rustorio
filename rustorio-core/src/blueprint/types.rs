@@ -144,6 +144,18 @@ impl SignalID {
         Self::new_virtual(format!("signal-{}", c.to_ascii_uppercase()))
     }
 
+    pub fn everything() -> Self {
+        Self::new_virtual("signal-everything".to_owned())
+    }
+
+    pub fn anything() -> Self {
+        Self::new_virtual("signal-anything".to_owned())
+    }
+
+    pub fn for_each() -> Self {
+        Self::new_virtual("signal-each".to_owned())
+    }
+
     pub fn into_signal(self, count: i32) -> Signal {
         Signal {
             r#type: self.r#type,

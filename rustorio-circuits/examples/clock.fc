@@ -5,7 +5,7 @@ mod clock {
 
     wire green tmp;
 
-    tmp[virtual-C] <- if clock_enable[virtual-E] > 0 then 1;
+    tmp[virtual-signal-C] <- if clock_enable[virtual-signal-E] > 0 then 1;
 
-    (tick, tmp)[virtual-C] <- if tmp[virtual-C] < 60 then _;
+    (tick, tmp)[virtual-signal-C] <- if tmp[virtual-signal-C] < 60 then _;
 }

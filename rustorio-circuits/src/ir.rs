@@ -58,17 +58,55 @@ pub enum Input {
     Signal(SignalID),
 }
 
+impl Input {
+    pub fn as_signal_id(&self) -> Option<SignalID> {
+        match self {
+            Input::Everything => Some(SignalID::everything()),
+            Input::Anything => Some(SignalID::anything()),
+            Input::ForEach => Some(SignalID::for_each()),
+            Input::Signal(signal_id) => Some(signal_id.clone()),
+            _ => None,
+        }
+    }
+
+    pub fn as_constant(&self) -> Option<i32> {
+        match self {
+            Input::Constant(c) => Some(*c),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum OutputSignal {
-    ForEach, // only if input was foreach
     Everything, // only for decider
+    ForEach, // only if input was foreach
     Signal(SignalID)
+}
+
+impl OutputSignal {
+    pub fn as_signal_id(&self) -> SignalID {
+        match self {
+            OutputSignal::Everything => SignalID::everything(),
+            OutputSignal::ForEach => SignalID::for_each(),
+            OutputSignal::Signal(signal_id) => signal_id.clone(),
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum OutputCount {
     One,
     InputSignal,
+}
+
+impl OutputCount {
+    pub fn is_input_signal(&self) -> bool {
+        match self {
+            OutputCount::InputSignal => true,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
@@ -86,6 +124,24 @@ pub enum ArithmeticOp {
     BitwiseXor,
 }
 
+impl ArithmeticOp {
+    pub fn as_op_str(&self) -> &'static str {
+        match self {
+            ArithmeticOp::Multiply => "*",
+            ArithmeticOp::Divide => "/",
+            ArithmeticOp::Add => "+",
+            ArithmeticOp::Subtract => "-",
+            ArithmeticOp::Modulo => "%",
+            ArithmeticOp::Power => "^",
+            ArithmeticOp::LeftShift => "<<",
+            ArithmeticOp::RightShift => ">>",
+            ArithmeticOp::BitwiseAnd => "AND",
+            ArithmeticOp::BitwiseOr  => "OR",
+            ArithmeticOp::BitwiseXor => "XOR",
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum DeciderOp {
     GreaterThan,
@@ -96,13 +152,25 @@ pub enum DeciderOp {
     NotEqual,
 }
 
+impl DeciderOp {
+    pub fn as_op_str(&self) -> &'static str {
+        match self {
+            DeciderOp::GreaterThan => ">",
+            DeciderOp::LessThan => "<",
+            DeciderOp::Equal => "=",
+            DeciderOp::GreaterEqual => "≥",
+            DeciderOp::LessEqual => "≤",
+            DeciderOp::NotEqual => "≠",
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ArithmeticCombinator {
     pub op: ArithmeticOp,
     pub left: Input,
     pub right: Input,
     pub output: OutputSignal,
-
     pub input_wires: Wires,
     pub output_wires: Wires,
 }
@@ -122,7 +190,6 @@ pub struct DeciderCombinator {
     pub right: Input,
     pub output_signal: OutputSignal,
     pub output_count: OutputCount,
-
     pub input_wires: Wires,
     pub output_wires: Wires,
 }
@@ -138,7 +205,6 @@ impl RenameWires for DeciderCombinator {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ConstantCombinator {
     pub signals: Vec<Signal>,
-    pub enabled: bool,
     pub wires: Wires,
 }
 

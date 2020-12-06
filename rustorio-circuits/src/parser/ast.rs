@@ -102,7 +102,6 @@ pub enum Statement {
     Constant {
         output: Output, // Must be wires only
         constants: Vec<SignalConst>,
-        disabled: bool,
     },
     Arithmetic {
         output: Output,

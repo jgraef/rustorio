@@ -39,7 +39,7 @@ pub WireDecl: WireDecl = {
 }
 
 pub Statement: Statement = {
-    <output:Output> "<-" <disabled:"off"?> "{" <constants:(<SignalConst> ";")*> "}" => Statement::Constant { disabled: disabled.is_some(), constants, output },
+    <output:Output> "<-" "{" <constants:(<SignalConst> ";")*> "}" => Statement::Constant { <> },
     <output:Output> "<-" "if" <left:Input> <op:DeciderOp> <right:Input> "then" <mode:DeciderMode> => Statement::Decider { <> },
     <output:Output> "<-" <left:Input> <op:ArithmeticOp> <right:Input> => Statement::Arithmetic { <> },
     "new" <ident:Ident> <generics:("<" <CommaSeperated<GenericArg>> ">")?> "(" <ports:CommaSeperated<PortDef>> ")" => Statement::ModuleInst { <> },

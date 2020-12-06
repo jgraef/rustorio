@@ -209,7 +209,7 @@ impl<'a> Compiler<'a> {
 
         for statement in &module.body.statements {
             match statement {
-                ast::Statement::Constant { output, constants, disabled } => {
+                ast::Statement::Constant { output, constants } => {
                     if output.signal.is_some() {
                         return Err(CompilerError::Todo);
                     }
@@ -222,7 +222,6 @@ impl<'a> Compiler<'a> {
 
                     combinators.push(ir::Combinator::Constant(ir::ConstantCombinator {
                         signals,
-                        enabled: !disabled,
                         wires: Self::map_wires(&wires, &output.wires)?,
                     }));
                 },
