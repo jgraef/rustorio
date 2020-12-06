@@ -1,8 +1,8 @@
 use std::str::FromStr;
 use crate::{
     parser::ast::{
-        ModDecl, ModBody, GenericDecl, PortDecl, WireDecl, Statement, Ident, Input, Output,
-        DeciderMode, Wires, GenericArg, PortDef, Unit, ImportPath, SignalConst, Signal,
+        ModDecl, ModBody, GenericDecl, GenericArg, PortDecl, WireDecl, Statement, Ident, Input, Output,
+        DeciderMode, Wires, PortDef, Unit, ImportPath, SignalConst, Signal, Expr,
     },
     ir::{ArithmeticOp, DeciderOp, WireColor},
 };
@@ -25,8 +25,8 @@ pub ModBody: ModBody = {
 }
 
 pub GenericDecl: GenericDecl = {
-    "#" <Ident> => GenericDecl::Num(<>),
-    "$" <Ident> => GenericDecl::SignalID(<>),
+    <NumVar> => GenericDecl::Number(<>),
+    <SignalVar> => GenericDecl::Signal(<>),
 }
 
 pub PortDecl: PortDecl = {
@@ -42,23 +42,20 @@ pub Statement: Statement = {
     <output:Output> "<-" "{" <constants:(<SignalConst> ";")*> "}" => Statement::Constant { <> },
     <output:Output> "<-" "if" <left:Input> <op:DeciderOp> <right:Input> "then" <mode:DeciderMode> => Statement::Decider { <> },
     <output:Output> "<-" <left:Input> <op:ArithmeticOp> <right:Input> => Statement::Arithmetic { <> },
-    "new" <ident:Ident> <generics:("<" <CommaSeperated<GenericArg>> ">")?> "(" <ports:CommaSeperated<PortDef>> ")" => Statement::ModuleInst { <> },
+    "new" <ident:Ident> <generics:("<" <CommaSeperated<Arg>> ">")?> "(" <ports:CommaSeperated<PortDef>> ")" => Statement::ModuleInst { <> },
+}
+
+pub Arg: GenericArg = {
+    <Signal> => GenericArg::Signal(<>),
+    <Expr5> => GenericArg::Number(<>),
 }
 
 pub PortDef: PortDef = {
     <port: Ident> ":" <wire: Ident> => PortDef { <> },
 }
 
-pub GenericArg: GenericArg = {
-    "#" <Ident> => GenericArg::NumVar(<>),
-    <Num> => GenericArg::NumConst(<>), // TODO: Allow const expressions
-    "$" <Ident> => GenericArg::SignalVar(<>),
-    <Ident> => GenericArg::SignalConst(<>),
-}
-
-
 pub SignalConst: SignalConst = {
-    <ident:Ident> "=" <constant:Num> => SignalConst { <> },
+    <signal:Signal> "=" <value:Expr1> => SignalConst { <> },
 }
 
 pub Output: Output = {
@@ -67,21 +64,12 @@ pub Output: Output = {
 
 pub Input: Input = {
     <wires:Wires> <signal:("[" <Signal> "]")?> => Input::Signal { <> },
-    <Num> => Input::Constant(<>),
-    "#" <Ident> => Input::GenericArg(<>),
+    <Expr5> => Input::Number(<>),
 }
 
 pub Wires: Wires = {
     <ident:Ident> => Wires::Single(ident),
     "(" <red:Ident> "," <green:Ident> ")" => Wires::Both { <> },
-}
-
-pub Signal: Signal = {
-    "all" => Signal::All,
-    "any" => Signal::Any,
-    "for" => Signal::ForEach,
-    <Ident> => Signal::Ident(<>),
-    "$" <Ident> => Signal::GenericArg(<>),
 }
 
 pub DeciderOp: DeciderOp = {
@@ -128,10 +116,59 @@ Seperated<T, S>: Vec<T> = {
     }
 };
 
+Expr1: Expr = {
+    <l:Expr1> "+" <r:Expr2> => Expr::Add(Box::new(l), Box::new(r)),
+    <l:Expr1> "-" <r:Expr2> => Expr::Sub(Box::new(l), Box::new(r)),
+    Expr2,
+}
+
+Expr2: Expr = {
+    <l:Expr2> "*" <r:Expr3> => Expr::Mul(Box::new(l), Box::new(r)),
+    <l:Expr2> "/" <r:Expr3> => Expr::Div(Box::new(l), Box::new(r)),
+    <l:Expr2> "%" <r:Expr3> => Expr::Mod(Box::new(l), Box::new(r)),
+    Expr3,
+}
+
+Expr3: Expr = {
+    <l:Expr3> "&" <r:Expr4> => Expr::BitAnd(Box::new(l), Box::new(r)),
+    <l:Expr3> "|" <r:Expr4> => Expr::BitOr(Box::new(l), Box::new(r)),
+    <l:Expr3> "^" <r:Expr4> => Expr::BitXor(Box::new(l), Box::new(r)),
+    Expr4,
+}
+
+Expr4: Expr = {
+    "-" <x:Expr5> => Expr::Neg(Box::new(x)),
+    "~" <x:Expr5> => Expr::BitNot(Box::new(x)),
+    Expr5,
+}
+
+Expr5: Expr = {
+    Num => Expr::Const(<>),
+    //NumHex => Expr::Const(<>),
+    //NumDec => Expr::Const(<>),
+    NumVar => Expr::Var(<>),
+    "(" <Expr1> ")",
+}
+
+pub SignalVar: Ident = "$(" <Ident> ")";
+
+pub NumVar: Ident = "#" <Ident>;
+
+pub Signal: Signal = {
+    <s:r"\$[a-zA-Z0-9]"> => Signal::shorthand(&s[1..]), // Shorthand for virtual signals
+    "$v(" <Ident> ")" => Signal::Virtual(<>),
+    "$i(" <Ident> ")" => Signal::Item(<>),
+    "$f(" <Ident> ")" => Signal::Fluid(<>),
+    "$each" => Signal::Each,
+    "$all" => Signal::All,
+    "$any" => Signal::Any,
+    SignalVar => Signal::Var(<>)
+}
+
 CommaSeperated<T>: Vec<T> = Seperated<T, ",">;
 DotSeperated<T>: Vec<T> = Seperated<T, ".">;
 
-Import: ImportPath = {
+pub Import: ImportPath = {
     "import" <path:DotSeperated<Ident>> ";" => ImportPath(<>),
 }
 

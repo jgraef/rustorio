@@ -1,0 +1,12 @@
+
+mod clock<#seconds, $(time), $(enable)> {
+    port red clock_enable;
+    port red time;
+
+    wire green tmp;
+
+    tmp[$(time)] <- if clock_enable[$(enable)] > 0 then 1;
+
+    (time, tmp)[$(time)] <- if tmp[$(time)] < (#seconds * 60) then _;
+}
+

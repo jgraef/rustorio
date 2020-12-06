@@ -74,8 +74,8 @@ pub struct ModBody {
 
 #[derive(Clone, Debug)]
 pub enum GenericDecl {
-    Num(Ident),
-    SignalID(Ident),
+    Number(Ident),
+    Signal(Ident),
 }
 
 #[derive(Clone, Debug)]
@@ -135,8 +135,7 @@ pub enum Input {
         wires: Wires,
         signal: Option<Signal>,
     },
-    Constant(i32),
-    GenericArg(Ident),
+    Number(Expr),
 }
 
 #[derive(Clone, Debug)]
@@ -150,11 +149,19 @@ pub enum Wires {
 
 #[derive(Clone, Debug)]
 pub enum Signal {
+    Virtual(Ident),
+    Item(Ident),
+    Fluid(Ident),
+    Each,
     All,
     Any,
-    ForEach,
-    Ident(Ident),
-    GenericArg(Ident),
+    Var(Ident),
+}
+
+impl Signal {
+    pub fn shorthand(s: &str) -> Self {
+        Signal::Virtual(Ident::from(format!("signal-{}", s.to_uppercase())))
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -165,10 +172,8 @@ pub enum DeciderMode {
 
 #[derive(Clone, Debug)]
 pub enum GenericArg {
-    NumVar(Ident),
-    NumConst(i32),
-    SignalVar(Ident),
-    SignalConst(Ident),
+    Signal(Signal),
+    Number(Expr),
 }
 
 #[derive(Clone, Debug)]
@@ -179,9 +184,53 @@ pub struct PortDef {
 
 #[derive(Clone, Debug)]
 pub struct SignalConst {
-    pub ident: Ident,
-    pub constant: i32,
+    pub signal: Signal,
+    pub value: Expr,
 }
+
+#[derive(Copy, Clone, Debug)]
+pub enum LiteralType {
+    Number,
+    Signal,
+}
+
+/*
+#[derive(Clone, Debug)]
+pub enum Literal {
+    Virtual(Ident),
+    Item(Ident),
+    Fluid(Ident),
+    Each,
+    All,
+    Any,
+    Number(i32),
+}
+
+impl Literal {
+    pub fn r#type(&self) -> LiteralType {
+        match self {
+            Literal::Number(_) => LiteralType::Number,
+            _ => LiteralType::Signal,
+        }
+    }
+}*/
+
+#[derive(Clone, Debug)]
+pub enum Expr {
+    Add(Box<Expr>, Box<Expr>),
+    Sub(Box<Expr>, Box<Expr>),
+    Mul(Box<Expr>, Box<Expr>),
+    Div(Box<Expr>, Box<Expr>),
+    Mod(Box<Expr>, Box<Expr>),
+    BitAnd(Box<Expr>, Box<Expr>),
+    BitOr(Box<Expr>, Box<Expr>),
+    BitXor(Box<Expr>, Box<Expr>),
+    BitNot(Box<Expr>),
+    Neg(Box<Expr>),
+    Const(i32),
+    Var(Ident),
+}
+
 
 #[derive(Clone, Debug, From, Into, AsRef, AsMut, Display, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Ident(String);

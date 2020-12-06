@@ -1,3 +1,6 @@
+pub mod assembler;
+
+
 use std::{
     collections::hash_map::{HashMap, Entry},
     sync::atomic::{AtomicU64, Ordering},
@@ -6,7 +9,7 @@ use std::{
 use serde::{Serialize, Deserialize};
 
 pub use rustorio_core::blueprint::types::{Signal, SignalID};
-
+use rustorio_core::blueprint::Blueprint;
 
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, derive_more::Display)]
@@ -244,6 +247,12 @@ pub struct Ir {
     pub ports: HashMap<(String, WireColor), WireId>,
 
     pub combinators: Vec<Combinator>,
+}
+
+impl Ir {
+    pub fn to_blueprint(&self) -> Result<Blueprint, assembler::Error> {
+        assembler::blueprint_from_ir(self)
+    }
 }
 
 impl RenameWires for Ir {

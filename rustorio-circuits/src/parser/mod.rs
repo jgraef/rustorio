@@ -195,6 +195,24 @@ impl Parser {
 }
 
 
+#[derive(Debug, Error)]
+#[error("Invalid signal: {0}")]
+pub struct ParseSignalError(String);
+
+pub fn parse_signal(s: &str) -> Result<ast::Signal, ParseSignalError> {
+    let e = || ParseSignalError(s.to_owned());
+
+    let signal = parser::SignalParser::new().parse(s).map_err(|_| e())?;
+
+    if let ast::Signal::Var(_) = &signal {
+        Err(e())
+    }
+    else {
+        Ok(signal)
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::parser;

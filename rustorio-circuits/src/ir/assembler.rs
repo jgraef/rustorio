@@ -107,7 +107,7 @@ pub fn blueprint_from_ir(ir: &ir::Ir) -> Result<Blueprint, Error> {
 }
 
 
-pub fn entity_from_ir(combinator: &ir::Combinator, position: Position, entity_numbers: &mut Sequential<UnitNumber>) -> Result<(Entity, ir::Wires, ir::Wires), Error> {
+fn entity_from_ir(combinator: &ir::Combinator, position: Position, entity_numbers: &mut Sequential<UnitNumber>) -> Result<(Entity, ir::Wires, ir::Wires), Error> {
     let mut control = ControlBehavior::default();
 
     let (entity_name, w1, w2) = match combinator {

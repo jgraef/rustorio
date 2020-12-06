@@ -1,11 +1,15 @@
+use std::{
+    str::FromStr,
+    collections::HashMap,
+};
+
 use thiserror::Error;
 
 use crate::{
     parser::ast,
     ir,
 };
-use std::collections::HashMap;
-use rustorio_core::blueprint::types::SignalIDParseError;
+use rustorio_core::blueprint::types::{SignalType, SignalIDParseError};
 
 
 #[derive(Debug, Error)]
@@ -27,6 +31,146 @@ pub enum CompilerError {
 
     #[error("Can't merge wires {0:?} and {1:?}")]
     WireConflict(ir::Wires, ir::Wires),
+
+    #[error("Signal not allowed in this context: {0:?}")]
+    SignalNotAllowed(ast::Signal),
+
+    #[error("Parameter is not a number: {0}")]
+    ParamNotANumber(ast::Ident),
+
+    #[error("Parameter is not a signal: {0}")]
+    ParamNotASignal(ast::Ident),
+
+    #[error("Parameter not found: {0}")]
+    ParamNotFound(ast::Ident),
+
+    #[error("Incorrect number of parameters: Expected {expected}, but got {got}")]
+    ParamCountMismatch {
+        expected: usize,
+        got: usize
+    },
+
+    #[error("Type of parameter '{param:?}' doesn't match type of declaration '{decl:?}'")]
+    ParamTypeMismatch {
+        decl: ast::GenericDecl,
+        param: Param,
+    },
+
+    #[error("Overflow while evaluating const expression: {0:?}")]
+    Overflow(ast::Expr),
+}
+
+
+#[derive(Debug, Error)]
+#[error("Failed parsing module parameter: {0}")]
+pub struct ParamParseError(String);
+
+#[derive(Clone, Debug)]
+pub enum Param {
+    Number(i32),
+    Signal(ir::SignalID),
+}
+
+impl FromStr for Param {
+    type Err = ParamParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let err = || ParamParseError(s.to_owned());
+
+        if let Ok(n) = s.parse::<i32>() {
+            Ok(Param::Number(n))
+        }
+        else {
+            let signal_id = s.parse().map_err(|_| err())?;
+            Ok(Param::Signal(signal_id))
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Scope<'a> {
+    /// Generic parameters of a module
+    // TODO: We could also store them in separate maps.
+    params: HashMap<&'a ast::Ident, Param>,
+
+    // TODO: Move ports and wires in here.
+}
+
+impl<'a> Scope<'a> {
+    pub fn new(decls: &'a Option<Vec<ast::GenericDecl>>, params: Vec<Param>) -> Result<Self, CompilerError> {
+        let mut scope = HashMap::new();
+
+        if let Some(decls) = decls {
+            if decls.len() != params.len() {
+                return Err(CompilerError::ParamCountMismatch { expected: decls.len(), got: params.len() });
+            }
+
+            for (decl, param) in decls.iter().zip(params.into_iter()) {
+                match (decl, &param) {
+                    (ast::GenericDecl::Number(ident), Param::Number {..}) => {
+                        scope.insert(ident, param);
+                    },
+                    (ast::GenericDecl::Signal(ident), Param::Signal {..}) => {
+                        scope.insert(ident, param);
+                    },
+                    _ => {
+                        return Err(CompilerError::ParamTypeMismatch { decl: decl.to_owned(), param });
+                    },
+                }
+            }
+        }
+        else if params.len() != 0 {
+            return Err(CompilerError::ParamCountMismatch { expected: 0, got: params.len() });
+        }
+
+        Ok(Self {
+            params: scope,
+        })
+    }
+
+    pub fn lookup_numeric(&self, name: &ast::Ident) -> Result<i32, CompilerError> {
+        match self.params.get(name) {
+            Some(Param::Number(n)) => Ok(*n),
+            Some(_) => Err(CompilerError::ParamNotANumber(name.clone())),
+            None => Err(CompilerError::ParamNotFound(name.clone())),
+        }
+    }
+
+    pub fn lookup_signal(&'a self, name: &ast::Ident) -> Result<&'a ir::SignalID, CompilerError> {
+        match self.params.get(name) {
+            Some(Param::Signal(s)) => Ok(s),
+            Some(_) => Err(CompilerError::ParamNotASignal(name.clone())),
+            None => Err(CompilerError::ParamNotFound(name.clone())),
+        }
+    }
+
+    fn eval_unary_op<F: FnMut(i32) -> Option<i32>>(&self, expr: &ast::Expr, operand: &ast::Expr, mut f: F) -> Result<i32, CompilerError> {
+        f(self.eval_expr(operand)?)
+            .ok_or_else(|| CompilerError::Overflow(expr.clone()))
+    }
+
+    fn eval_binary_op<F: FnMut(i32, i32) -> Option<i32>>(&self, expr: &ast::Expr, left: &ast::Expr, right: &ast::Expr, mut f: F) -> Result<i32, CompilerError> {
+        f(self.eval_expr(left)?, self.eval_expr(right)?)
+            .ok_or_else(|| CompilerError::Overflow(expr.clone()))
+    }
+
+    pub fn eval_expr(&self, expr: &ast::Expr) -> Result<i32, CompilerError> {
+        match expr {
+            ast::Expr::Add(left, right) => self.eval_binary_op(expr, left, right, i32::checked_add),
+            ast::Expr::Sub(left, right) => self.eval_binary_op(expr, left, right, i32::checked_sub),
+            ast::Expr::Mul(left, right) => self.eval_binary_op(expr, left, right, i32::checked_mul),
+            ast::Expr::Div(left, right) => self.eval_binary_op(expr, left, right, i32::checked_div),
+            ast::Expr::Mod(left, right) => self.eval_binary_op(expr, left, right, i32::checked_rem_euclid),
+            ast::Expr::BitAnd(left, right) => self.eval_binary_op(expr, left, right, |a, b| Some(a & b)),
+            ast::Expr::BitOr(left, right) => self.eval_binary_op(expr, left, right, |a, b| Some(a | b)),
+            ast::Expr::BitXor(left, right) => self.eval_binary_op(expr, left, right, |a, b| Some(a ^ b)),
+            ast::Expr::BitNot(operand) => self.eval_unary_op(expr, operand, |a| Some(!a)),
+            ast::Expr::Neg(operand) => self.eval_unary_op(expr, operand, i32::checked_neg),
+            ast::Expr::Const(n) => Ok(*n),
+            ast::Expr::Var(name) => Ok(self.lookup_numeric(name)?),
+        }
+    }
+
 }
 
 
@@ -104,78 +248,62 @@ impl<'a> Compiler<'a> {
         Ok(ir::Wires { red, green })
     }
 
-    fn lookup_signal_id(&self, ident: &ast::Ident) -> Result<ir::SignalID, CompilerError> {
-        Ok(ident.as_ref().parse()?)
+    fn lookup_signal_literal(&self, r#type: SignalType, ident: &ast::Ident) -> Result<ir::SignalID, CompilerError> {
+        // TODO: Check if the signal exists. In order to do that, store a set of all available signals in the compiler
+        //       config. By default this can be the vanilla signals that are hard-coded, but could also be taken from
+        //       the loaded prototypes.
+        Ok(ir::SignalID::new(r#type, ident.as_ref().to_owned()))
     }
 
-    fn map_input(&self, input: &ast::Input, _generics: &HashMap<&ast::Ident, &ast::GenericArg>, wire_map: &HashMap<&ast::Ident, (ir::WireId, ir::WireColor)>) -> Result<(ir::Input, ir::Wires), CompilerError> {
+    fn map_input(&self, input: &ast::Input, scope: &Scope, wire_map: &HashMap<&ast::Ident, (ir::WireId, ir::WireColor)>) -> Result<(ir::Input, ir::Wires), CompilerError> {
         Ok(match input {
             ast::Input::Signal { wires, signal } => {
                 (
                     match signal.as_ref().ok_or_else(|| CompilerError::Todo)? {
+                        ast::Signal::Each => ir::Input::ForEach,
                         ast::Signal::All => ir::Input::Everything,
                         ast::Signal::Any => ir::Input::Anything,
-                        ast::Signal::ForEach => ir::Input::ForEach,
-                        ast::Signal::Ident(ident) => ir::Input::Signal(self.lookup_signal_id(ident)?),
-                        ast::Signal::GenericArg(_ident) => {
-                            // signal generic
-                            todo!()
-                        },
+                        ast::Signal::Virtual(ident) => ir::Input::Signal(self.lookup_signal_literal(SignalType::Virtual, ident)?),
+                        ast::Signal::Item(ident) => ir::Input::Signal(self.lookup_signal_literal(SignalType::Item, ident)?),
+                        ast::Signal::Fluid(ident) => ir::Input::Signal(self.lookup_signal_literal(SignalType::Fluid, ident)?),
+                        ast::Signal::Var(var) => ir::Input::Signal(scope.lookup_signal(var)?.clone()),
                     },
                     Self::map_wires(wire_map, wires)?,
                 )
             },
-            ast::Input::Constant(constant) => {
-                (ir::Input::Constant(*constant), ir::Wires::default())
-            }
-            ast::Input::GenericArg(_ident) => {
-                // numeric generic
-                todo!();
-            }
+            ast::Input::Number(expr) => {
+                (
+                    ir::Input::Constant(scope.eval_expr(expr)?),
+                    ir::Wires::default(),
+                )
+            },
         })
     }
 
-    fn map_output(&self, output: &ast::Output, _generics: &HashMap<&ast::Ident, &ast::GenericArg>, wire_map: &HashMap<&ast::Ident, (ir::WireId, ir::WireColor)>) -> Result<(ir::OutputSignal, ir::Wires), CompilerError> {
+    fn map_output(&self, output: &ast::Output, scope: &Scope, wire_map: &HashMap<&ast::Ident, (ir::WireId, ir::WireColor)>) -> Result<(ir::OutputSignal, ir::Wires), CompilerError> {
+        let signal = output.signal.as_ref().ok_or_else(|| CompilerError::Todo)?;
         Ok((
-            match output.signal.as_ref().ok_or_else(|| CompilerError::Todo)? {
+            match signal {
+                ast::Signal::Each => ir::OutputSignal::ForEach,
                 ast::Signal::All => ir::OutputSignal::Everything,
-                ast::Signal::Any => return Err(CompilerError::Todo),
-                ast::Signal::ForEach => ir::OutputSignal::ForEach,
-                ast::Signal::Ident(ident) => ir::OutputSignal::Signal(self.lookup_signal_id(ident)?),
-                ast::Signal::GenericArg(_) => todo!(),
+                ast::Signal::Any => return Err(CompilerError::SignalNotAllowed(signal.clone())),
+                ast::Signal::Virtual(ident) => ir::OutputSignal::Signal(self.lookup_signal_literal(SignalType::Virtual, ident)?),
+                ast::Signal::Item(ident) => ir::OutputSignal::Signal(self.lookup_signal_literal(SignalType::Item, ident)?),
+                ast::Signal::Fluid(ident) => ir::OutputSignal::Signal(self.lookup_signal_literal(SignalType::Fluid, ident)?),
+                ast::Signal::Var(var) => ir::OutputSignal::Signal(scope.lookup_signal(var)?.clone()),
             },
             Self::map_wires(wire_map, &output.wires)?,
         ))
     }
 
-    pub fn compile_module(&self, ident: &ast::Ident, _generic_args: Vec<&ast::GenericArg>) -> Result<ir::Ir, CompilerError> {
+    pub fn compile_module(&self, ident: &ast::Ident, params: Vec<Param>) -> Result<ir::Ir, CompilerError> {
         let module = *self.modules.get(ident)
             .ok_or_else(|| CompilerError::UnknownModule(ident.to_owned()))?;
 
-        let generics: HashMap<&ast::Ident, &ast::GenericArg> = HashMap::new();
+        let scope = Scope::new(&module.generics, params)?;
         let mut wires: HashMap<&ast::Ident, (ir::WireId, ir::WireColor)> = HashMap::new();
         let mut ports: HashMap<(&ast::Ident, ir::WireColor), ir::WireId> = HashMap::new();
         let mut combinators = vec![];
-
-        /*
-        let empty_generics = vec![];
-        let generic_decls = module.generics.as_ref().unwrap_or(&empty_generics);
-
-        if generic_args.len() != generic_decls.len() {
-            return Err(CompilerError::Todo);
-        }
-
-        for (generic_decl, generic_arg) in generic_decls.into_iter().zip(generic_args) {
-            match generic_decl {
-                ast::GenericDecl::SignalID(ident) => {
-                    generics.insert(ident, generic_arg);
-                },
-                ast::GenericDecl::Num(ident) => {
-                    todo!()
-                }
-            }
-        }
-        */
 
         for port_decl in &module.body.ports {
             match port_decl {
@@ -215,9 +343,18 @@ impl<'a> Compiler<'a> {
                     }
 
                     let mut signals = vec![];
-                    for sig in constants {
-                        let signal_id = self.lookup_signal_id(&sig.ident)?;
-                        signals.push(signal_id.into_signal(sig.constant));
+                    for ast::SignalConst { signal, value } in constants {
+                        let signal_id = match signal {
+                            ast::Signal::Each | ast::Signal::All | ast::Signal::Any => {
+                                return Err(CompilerError::SignalNotAllowed(signal.clone()));
+                            },
+                            ast::Signal::Virtual(ident) => self.lookup_signal_literal(SignalType::Virtual, ident)?,
+                            ast::Signal::Item(ident) => self.lookup_signal_literal(SignalType::Item, ident)?,
+                            ast::Signal::Fluid(ident) => self.lookup_signal_literal(SignalType::Fluid, ident)?,
+                            ast::Signal::Var(var) => scope.lookup_signal(var)?.clone(),
+                        };
+                        signals.push(signal_id.into_signal(scope.eval_expr(value)?));
+                        todo!();
                     }
 
                     combinators.push(ir::Combinator::Constant(ir::ConstantCombinator {
@@ -227,10 +364,10 @@ impl<'a> Compiler<'a> {
                 },
 
                 ast::Statement::Arithmetic { output, op, left, right } => {
-                    let (left_input, left_wires) = self.map_input(left, &generics, &wires)?;
-                    let (right_input, right_wires) = self.map_input(right, &generics, &wires)?;
+                    let (left_input, left_wires) = self.map_input(left, &scope, &wires)?;
+                    let (right_input, right_wires) = self.map_input(right, &scope, &wires)?;
                     let input_wires = Self::merge_wires(left_wires, right_wires)?;
-                    let (output_signal, output_wires) = self.map_output(output, &generics, &wires)?;
+                    let (output_signal, output_wires) = self.map_output(output, &scope, &wires)?;
 
                     combinators.push(ir::Combinator::Arithmetic(ir::ArithmeticCombinator {
                         op: *op,
@@ -243,10 +380,10 @@ impl<'a> Compiler<'a> {
                 },
 
                 ast::Statement::Decider { output, op, left, right, mode } => {
-                    let (left_input, left_wires) = self.map_input(left, &generics, &wires)?;
-                    let (right_input, right_wires) = self.map_input(right, &generics, &wires)?;
+                    let (left_input, left_wires) = self.map_input(left, &scope, &wires)?;
+                    let (right_input, right_wires) = self.map_input(right, &scope, &wires)?;
                     let input_wires = Self::merge_wires(left_wires, right_wires)?;
-                    let (output_signal, output_wires) = self.map_output(output, &generics, &wires)?;
+                    let (output_signal, output_wires) = self.map_output(output, &scope, &wires)?;
 
                     let output_count = match mode {
                         ast::DeciderMode::One => ir::OutputCount::One,

@@ -3,7 +3,6 @@ pub mod parser;
 pub mod compiler;
 //pub mod simulator;
 pub mod signals;
-pub mod blueprint;
 
 use std::{
     path::{PathBuf, Path},
@@ -18,6 +17,7 @@ use rustorio_core::blueprint::Envelope;
 
 use crate::{
     parser::{ParserConfig, Parser},
+    compiler::Param,
     ir::Ir,
 };
 use crate::compiler::Compiler;
@@ -43,12 +43,21 @@ enum Opt {
         #[structopt(short="r", long="root", default_value="main")]
         root: String,
 
+        /// Parameters for instantiation of root module
+        #[structopt(short="P", long="param")]
+        params: Vec<String>,
+
         /// Input source files.
         inputs: Vec<PathBuf>,
     },
 }
 
-fn compile_to_ir(inputs: Vec<PathBuf>, mut imports: Vec<PathBuf>, root: String) -> Result<Ir, Error> {
+fn compile_to_ir(inputs: Vec<PathBuf>, mut imports: Vec<PathBuf>, root: String, params: Vec<String>) -> Result<Ir, Error> {
+
+    let params = params.into_iter()
+        .map(|p| p.parse())
+        .collect::<Result<Vec<Param>, _>>()?;
+
     let mut config = ParserConfig::default();
     config.import_paths.append(&mut imports);
 
@@ -63,11 +72,11 @@ fn compile_to_ir(inputs: Vec<PathBuf>, mut imports: Vec<PathBuf>, root: String) 
     log::debug!("AST: {:#?}", ast);
 
     let compiler = Compiler::new(&ast);
-    let ir = compiler.compile_module(&root.into(), vec![])?;
+    let ir = compiler.compile_module(&root.into(), params)?;
 
     log::debug!("IR: {:#?}", ir);
 
-    let blueprint = crate::blueprint::blueprint_from_ir(&ir)?;
+    let blueprint = ir.to_blueprint()?;
 
     log::debug!("Blueprint: {:#?}", blueprint);
     log::debug!("Blueprint: {}", Envelope::Blueprint(blueprint).encode()?);
@@ -89,8 +98,8 @@ fn main() -> Result<(), Error> {
     let opt = Opt::from_args();
 
     match opt {
-        Opt::Compile { imports, ir_out, output, root, inputs } => {
-            let ir = compile_to_ir(inputs, imports, root)?;
+        Opt::Compile { imports, ir_out, output, root, params, inputs } => {
+            let ir = compile_to_ir(inputs, imports, root, params)?;
             if let Some(ir_out) = ir_out {
                 write_ir_to_file(ir_out, &ir)?;
             }
