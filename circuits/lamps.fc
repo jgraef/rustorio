@@ -1,0 +1,27 @@
+
+// Circuit with n lamps
+mod lamps<#n> {
+	port red io;
+
+	// If this circuit has at least 1 lamp, construct it. Otherwise this is an empty circuit.
+	if #n > 0 {
+		// Construct one lamp and connect it to port `io`.
+		lamp io[$x] == #n;
+
+		// Construct the remaining lamps
+		new lamps<#n - 1>(io: io);
+	};
+}
+
+
+mod main<#n> {
+    wire red input;
+
+    input <- {
+        $x = 1,
+    };
+
+	// Construct n lamps
+    new lamps<#n>(io: input);
+}
+

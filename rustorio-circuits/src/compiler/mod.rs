@@ -58,6 +58,12 @@ pub enum CompilerError {
 
     #[error("Overflow while evaluating const expression: {0:?}")]
     Overflow(ast::Expr),
+
+    #[error("Conflict while connecting port: {port} (color {color:?})")]
+    PortConflict {
+        port: ast::Ident,
+        color: ir::WireColor,
+    },
 }
 
 
@@ -84,6 +90,37 @@ impl FromStr for Param {
             let signal_id = s.parse().map_err(|_| err())?;
             Ok(Param::Signal(signal_id))
         }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct PortConnections<'a> {
+    conns: HashMap<&'a ast::Ident, ir::Wires>,
+}
+
+impl<'a> PortConnections<'a> {
+    pub fn new(port_args: &'a [ast::PortArg], wire_map: &HashMap<&ast::Ident, (ir::WireId, ir::WireColor)>) -> Result<Self, CompilerError> {
+        let mut conns: HashMap<_, ir::Wires> = HashMap::new();
+
+        for ast::PortArg { port, wire } in port_args {
+            if let Some((wire_id, color)) = wire_map.get(wire) {
+                let wires = conns.entry(port)
+                    .or_default();
+
+                if wires.set_color(*color, *wire_id).is_some() {
+                    return Err(CompilerError::PortConflict {
+                        port: port.clone(),
+                        color: *color,
+                    });
+                }
+            }
+        }
+
+        Ok(Self { conns })
+    }
+
+    pub fn get(&self, ident: &ast::Ident) -> Option<&ir::Wires> {
+        self.conns.get(ident)
     }
 }
 
@@ -169,6 +206,20 @@ impl<'a> Scope<'a> {
             ast::Expr::Const(n) => Ok(*n),
             ast::Expr::Var(name) => Ok(self.lookup_numeric(name)?),
         }
+    }
+
+    pub fn eval_cond(&self, cond: &ast::ConstCond) -> Result<bool, CompilerError> {
+        let left = self.eval_expr(&cond.left)?;
+        let right = self.eval_expr(&cond.right)?;
+
+        Ok(match cond.op {
+            ir::DeciderOp::GreaterThan => left > right,
+            ir::DeciderOp::LessThan => left < right,
+            ir::DeciderOp::Equal => left == right,
+            ir::DeciderOp::GreaterEqual => left >= right,
+            ir::DeciderOp::LessEqual => left <= right,
+            ir::DeciderOp::NotEqual => left != right,
+        })
     }
 
 }
@@ -296,129 +347,199 @@ impl<'a> Compiler<'a> {
         ))
     }
 
-    pub fn compile_module(&self, ident: &ast::Ident, params: Vec<Param>) -> Result<ir::Ir, CompilerError> {
-        let module = *self.modules.get(ident)
-            .ok_or_else(|| CompilerError::UnknownModule(ident.to_owned()))?;
+    pub fn compile_module(&self, mod_ident: &ast::Ident, params: Vec<Param>, port_conns: Option<PortConnections<'a>>) -> Result<ir::Ir, CompilerError> {
+        let module = *self.modules.get(mod_ident)
+            .ok_or_else(|| CompilerError::UnknownModule(mod_ident.to_owned()))?;
 
         let scope = Scope::new(&module.generics, params)?;
-        let mut wires: HashMap<&ast::Ident, (ir::WireId, ir::WireColor)> = HashMap::new();
+        // TODO: Put wires into scope
+        let mut wire_map: HashMap<&ast::Ident, (ir::WireId, ir::WireColor)> = HashMap::new();
+        // TODO: I think we don't need `ports` if we don't export them.
         let mut ports: HashMap<(&ast::Ident, ir::WireColor), ir::WireId> = HashMap::new();
         let mut combinators = vec![];
 
+        log::trace!("port_conns = {:?}", port_conns);
+
         for port_decl in &module.body.ports {
             match port_decl {
-                ast::PortDecl::Both { ident, red, green } => {
+                ast::PortDecl::Both { ident: port_ident, red, green } => {
+                    let port_wires = port_conns
+                        .as_ref()
+                        .and_then(|port_conns| port_conns.get(port_ident).copied())
+                        .unwrap_or_default();
+
+                    log::trace!("port_wires = {:?}", port_wires);
+
                     if !red.is_placeholder() {
-                        let red_id = self.wire_ids.next();
-                        ports.insert((ident, ir::WireColor::Red), red_id);
-                        wires.insert(red, (red_id, ir::WireColor::Red));
+                        let red_id = port_wires.red.unwrap_or_else(|| self.wire_ids.next());
+                        log::trace!("Connect port {:?} to red wire_id={}", port_decl, red_id);
+                        ports.insert((port_ident, ir::WireColor::Red), red_id);
+                        wire_map.insert(red, (red_id, ir::WireColor::Red));
                     }
 
                     if !green.is_placeholder() {
-                        let green_id = self.wire_ids.next();
-                        ports.insert((ident, ir::WireColor::Green), green_id);
-                        wires.insert(green, (green_id, ir::WireColor::Green));
+                        let green_id = port_wires.green.unwrap_or_else(|| self.wire_ids.next());
+                        log::trace!("Connect port {:?} to green wire_id={}", port_decl, green_id);
+                        ports.insert((port_ident, ir::WireColor::Green), green_id);
+                        wire_map.insert(green, (green_id, ir::WireColor::Green));
                     }
                 },
-                ast::PortDecl::ShortHand { ident, color } => {
-                    let wire_id = self.wire_ids.next();
-                    ports.insert((ident, *color), wire_id);
-                    wires.insert(ident, (wire_id, *color));
+
+                ast::PortDecl::ShortHand { ident: port_ident, color } => {
+                    let port_wires = port_conns
+                        .as_ref()
+                        .and_then(|port_conns| port_conns.get(port_ident).copied())
+                        .unwrap_or_default();
+
+                    log::trace!("port_wires = {:?}", port_wires);
+
+                    let wire_id = port_wires.get_color(*color).unwrap_or_else(|| self.wire_ids.next());
+                    log::trace!("Connect port {:?} to wire_id={}", port_decl, wire_id);
+                    ports.insert((port_ident, *color), wire_id);
+                    wire_map.insert(port_ident, (wire_id, *color));
                 },
             }
         }
 
         for ast::WireDecl { color, ident } in &module.body.wires {
-            wires.insert(&ident, (self.wire_ids.next(), *color));
+            wire_map.insert(&ident, (self.wire_ids.next(), *color));
         }
 
-        log::debug!("Declared ports: {:#?}", ports);
-        log::debug!("Declared wires: {:#?}", wires);
+        //log::debug!("Declared ports: {:#?}", ports);
+        //log::debug!("Declared wires: {:#?}", wire_map);
 
-        for statement in &module.body.statements {
-            match statement {
-                ast::Statement::Constant { output, constants } => {
-                    if output.signal.is_some() {
-                        return Err(CompilerError::Todo);
-                    }
-
-                    let mut signals = vec![];
-                    for ast::SignalConst { signal, value } in constants {
-                        let signal_id = match signal {
-                            ast::Signal::Each | ast::Signal::All | ast::Signal::Any => {
-                                return Err(CompilerError::SignalNotAllowed(signal.clone()));
-                            },
-                            ast::Signal::Virtual(ident) => self.lookup_signal_literal(SignalType::Virtual, ident)?,
-                            ast::Signal::Item(ident) => self.lookup_signal_literal(SignalType::Item, ident)?,
-                            ast::Signal::Fluid(ident) => self.lookup_signal_literal(SignalType::Fluid, ident)?,
-                            ast::Signal::Var(var) => scope.lookup_signal(var)?.clone(),
-                        };
-                        signals.push(signal_id.into_signal(scope.eval_expr(value)?));
-                        todo!();
-                    }
-
-                    combinators.push(ir::Combinator::Constant(ir::ConstantCombinator {
-                        signals,
-                        wires: Self::map_wires(&wires, &output.wires)?,
-                    }));
-                },
-
-                ast::Statement::Arithmetic { output, op, left, right } => {
-                    let (left_input, left_wires) = self.map_input(left, &scope, &wires)?;
-                    let (right_input, right_wires) = self.map_input(right, &scope, &wires)?;
-                    let input_wires = Self::merge_wires(left_wires, right_wires)?;
-                    let (output_signal, output_wires) = self.map_output(output, &scope, &wires)?;
-
-                    combinators.push(ir::Combinator::Arithmetic(ir::ArithmeticCombinator {
-                        op: *op,
-                        left: left_input,
-                        right: right_input,
-                        output: output_signal,
-                        input_wires,
-                        output_wires,
-                    }));
-                },
-
-                ast::Statement::Decider { output, op, left, right, mode } => {
-                    let (left_input, left_wires) = self.map_input(left, &scope, &wires)?;
-                    let (right_input, right_wires) = self.map_input(right, &scope, &wires)?;
-                    let input_wires = Self::merge_wires(left_wires, right_wires)?;
-                    let (output_signal, output_wires) = self.map_output(output, &scope, &wires)?;
-
-                    let output_count = match mode {
-                        ast::DeciderMode::One => ir::OutputCount::One,
-                        ast::DeciderMode::Input(ident) => {
-                            if !ident.is_placeholder() {
-                                // TODO: Handle the case that we specify the output signal here and not in the output expression.
-                                todo!();
-                            }
-                            else {
-                                ir::OutputCount::InputSignal
-                            }
-                        },
-                    };
-
-                    combinators.push(ir::Combinator::Decider(ir::DeciderCombinator {
-                        op: *op,
-                        left: left_input,
-                        right: right_input,
-                        output_signal,
-                        output_count,
-                        input_wires,
-                        output_wires,
-                    }));
-                },
-
-                ast::Statement::ModuleInst { .. } => {
-                    todo!();
-                },
-            }
-        }
+        self.compile_statements(&module.body.statements, &mut combinators, &scope, &wire_map)?;
 
         Ok(ir::Ir {
-            name: Some(ident.as_ref().to_owned()),
-            ports: Default::default(),
+            name: Some(mod_ident.as_ref().to_owned()),
+            ports: Default::default(), // TODO, export port connections
             combinators,
         })
+    }
+
+    pub fn compile_statements(&self, statements: &'a [ast::Statement], combinators: &mut Vec<ir::Combinator>, scope: &Scope, wire_map: &HashMap<&ast::Ident, (ir::WireId, ir::WireColor)>) -> Result<(), CompilerError> {
+        for statement in statements {
+            self.compile_statement(statement, combinators, scope, wire_map)?;
+        }
+        Ok(())
+    }
+
+    pub fn compile_statement(&self, statement: &'a ast::Statement, combinators: &mut Vec<ir::Combinator>, scope: &Scope, wire_map: &HashMap<&ast::Ident, (ir::WireId, ir::WireColor)>) -> Result<(), CompilerError> {
+        log::debug!("Compiling statement: {:?}", statement);
+
+        match statement {
+            ast::Statement::Constant { output, constants } => {
+                if output.signal.is_some() {
+                    return Err(CompilerError::Todo);
+                }
+
+                let mut signals = vec![];
+                for ast::SignalConst { signal, value } in constants {
+                    let signal_id = match signal {
+                        ast::Signal::Virtual(ident) => self.lookup_signal_literal(SignalType::Virtual, ident)?,
+                        ast::Signal::Item(ident) => self.lookup_signal_literal(SignalType::Item, ident)?,
+                        ast::Signal::Fluid(ident) => self.lookup_signal_literal(SignalType::Fluid, ident)?,
+                        ast::Signal::Var(var) => scope.lookup_signal(var)?.clone(),
+                        _ => return Err(CompilerError::SignalNotAllowed(signal.clone())),
+                    };
+                    signals.push(signal_id.into_signal(scope.eval_expr(value)?));
+                }
+
+                combinators.push(ir::Combinator::Constant(ir::ConstantCombinator {
+                    signals,
+                    wires: Self::map_wires(&wire_map, &output.wires)?,
+                }));
+            },
+
+            ast::Statement::Arithmetic { output, op, left, right } => {
+                let (left_input, left_wires) = self.map_input(left, &scope, &wire_map)?;
+                let (right_input, right_wires) = self.map_input(right, &scope, &wire_map)?;
+                let input_wires = Self::merge_wires(left_wires, right_wires)?;
+                let (output_signal, output_wires) = self.map_output(output, &scope, &wire_map)?;
+
+                combinators.push(ir::Combinator::Arithmetic(ir::ArithmeticCombinator {
+                    op: *op,
+                    left: left_input,
+                    right: right_input,
+                    output: output_signal,
+                    input_wires,
+                    output_wires,
+                }));
+            },
+
+            ast::Statement::Decider { output, op, left, right, mode } => {
+                let (left_input, left_wires) = self.map_input(left, &scope, &wire_map)?;
+                let (right_input, right_wires) = self.map_input(right, &scope, &wire_map)?;
+                let input_wires = Self::merge_wires(left_wires, right_wires)?;
+                let (output_signal, output_wires) = self.map_output(output, &scope, &wire_map)?;
+
+                let output_count = match mode {
+                    ast::DeciderMode::One => ir::OutputCount::One,
+                    ast::DeciderMode::Passthrough => ir::OutputCount::InputSignal,
+                };
+
+                combinators.push(ir::Combinator::Decider(ir::DeciderCombinator {
+                    op: *op,
+                    left: left_input,
+                    right: right_input,
+                    output_signal,
+                    output_count,
+                    input_wires,
+                    output_wires,
+                }));
+            },
+
+            ast::Statement::Lamp { op, left, right } => {
+                let (left_input, left_wires) = self.map_input(left, &scope, &wire_map)?;
+                let (right_input, right_wires) = self.map_input(right, &scope, &wire_map)?;
+                let input_wires = Self::merge_wires(left_wires, right_wires)?;
+
+                combinators.push(ir::Combinator::Lamp(ir::Lamp {
+                    op: *op,
+                    left: left_input,
+                    right: right_input,
+                    input_wires,
+                    use_color: false,
+                }));
+            }
+
+            ast::Statement::ModuleInst { ident, generics, ports } => {
+                let mut params = vec![];
+                if let Some(generics) = generics {
+                    for param in generics {
+                        params.push(match param {
+                            ast::GenericArg::Number(expr) => Param::Number(scope.eval_expr(expr)?),
+                            ast::GenericArg::Signal(signal) => {
+                                let signal_id = match signal {
+                                    ast::Signal::Virtual(ident) => self.lookup_signal_literal(SignalType::Virtual, ident)?,
+                                    ast::Signal::Item(ident) => self.lookup_signal_literal(SignalType::Item, ident)?,
+                                    ast::Signal::Fluid(ident) => self.lookup_signal_literal(SignalType::Fluid, ident)?,
+                                    ast::Signal::Var(var) => scope.lookup_signal(var)?.clone(),
+                                    _ => return Err(CompilerError::SignalNotAllowed(signal.clone())),
+                                };
+                                Param::Signal(signal_id)
+                            },
+                        });
+                    }
+                }
+
+                let port_conns = PortConnections::new(ports, &wire_map)?;
+
+                let mut ir = self.compile_module(ident, params, Some(port_conns))?;
+
+                combinators.append(&mut ir.combinators);
+            },
+
+            ast::Statement::Conditional { cond, then_case, else_case } => {
+                if scope.eval_cond(cond)? {
+                    self.compile_statements(then_case, combinators, scope, wire_map)?;
+                }
+                else if let Some(else_case) = else_case {
+                    self.compile_statements(else_case, combinators, scope, wire_map)?;
+                }
+            },
+        }
+
+        Ok(())
     }
 }

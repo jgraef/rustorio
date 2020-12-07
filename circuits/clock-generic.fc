@@ -1,0 +1,21 @@
+
+mod clock<#seconds, $(time), $(enable)> {
+    port red clock_enable;
+    port red time;
+
+    wire green tmp;
+
+    tmp[$(time)] <- if clock_enable[$(enable)] > 0 then !1;
+
+    (time, tmp)[$(time)] <- if tmp[$(time)] < (#seconds * 60) then _;
+}
+
+mod main {
+    wire red time;
+    wire red clock_enable;
+
+    clock_enable <- { $e = 1 };
+    lamp time[$t] == 1;
+
+    new clock<1, $t, $e>(time: time, clock_enable: clock_enable);
+}

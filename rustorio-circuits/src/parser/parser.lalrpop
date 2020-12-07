@@ -2,7 +2,7 @@ use std::str::FromStr;
 use crate::{
     parser::ast::{
         ModDecl, ModBody, GenericDecl, GenericArg, PortDecl, WireDecl, Statement, Ident, Input, Output,
-        DeciderMode, Wires, PortDef, Unit, ImportPath, SignalConst, Signal, Expr,
+        DeciderMode, Wires, PortArg, Unit, ImportPath, SignalConst, Signal, Expr, ConstCond,
     },
     ir::{ArithmeticOp, DeciderOp, WireColor},
 };
@@ -21,7 +21,8 @@ pub ModDecl: ModDecl = {
 }
 
 pub ModBody: ModBody = {
-    <ports:(<PortDecl> ";")*> <wires:(<WireDecl> ";")*> <statements:(<Statement> ";")*> => ModBody { <> },
+    // TODO: Put PortDecl, WireDecl and Statement into one rule, so that we can just parse a ;-seperated list of that
+    <ports:(<PortDecl> ";")*> <wires:(<WireDecl> ";")*> <statements:(<Statement>)*> => ModBody { <> },
 }
 
 pub GenericDecl: GenericDecl = {
@@ -39,19 +40,30 @@ pub WireDecl: WireDecl = {
 }
 
 pub Statement: Statement = {
-    <output:Output> "<-" "{" <constants:(<SignalConst> ";")*> "}" => Statement::Constant { <> },
-    <output:Output> "<-" "if" <left:Input> <op:DeciderOp> <right:Input> "then" <mode:DeciderMode> => Statement::Decider { <> },
-    <output:Output> "<-" <left:Input> <op:ArithmeticOp> <right:Input> => Statement::Arithmetic { <> },
-    "new" <ident:Ident> <generics:("<" <CommaSeperated<Arg>> ">")?> "(" <ports:CommaSeperated<PortDef>> ")" => Statement::ModuleInst { <> },
+    //<output:Output> "<-" "{" <constants:(<SignalConst> ";")*> "}" ";" => Statement::Constant { <> },
+    <output:Output> "<-" "{" <constants:CommaSeperated<SignalConst>> "}" ";" => Statement::Constant { <> },
+
+    <output:Output> "<-" "if" <left:Input> <op:DeciderOp> <right:Input> "then" <mode:DeciderMode> ";" => Statement::Decider { <> },
+
+    <output:Output> "<-" <left:Input> <op:ArithmeticOp> <right:Input> ";" => Statement::Arithmetic { <> },
+
+    // FIXME: Lamp doesn't take consts as input??
+    "lamp" <left:Input> <op:DeciderOp> <right:Input> ";" => Statement::Lamp { <> },
+
+    //"speaker" <left:Output> <op:DeciderOp> <Expr> ";" => Statement::Speaker { <> },
+
+    "new" <ident:Ident> <generics:("<" <CommaSeperated<GenericArg>> ">")?> "(" <ports:CommaSeperated<PortArg>> ")" ";" => Statement::ModuleInst { <> },
+
+    "if" <cond:ConstCond> "{" <then_case:(<Statement>)*> "}" <else_case:("else" "{" <(<Statement>)*> "}")?> ";" => Statement::Conditional { <> },
 }
 
-pub Arg: GenericArg = {
+pub GenericArg: GenericArg = {
     <Signal> => GenericArg::Signal(<>),
-    <Expr5> => GenericArg::Number(<>),
+    <Expr1> => GenericArg::Number(<>),
 }
 
-pub PortDef: PortDef = {
-    <port: Ident> ":" <wire: Ident> => PortDef { <> },
+pub PortArg: PortArg = {
+    <port: Ident> ":" <wire: Ident> => PortArg { <> },
 }
 
 pub SignalConst: SignalConst = {
@@ -96,8 +108,8 @@ pub ArithmeticOp: ArithmeticOp = {
 }
 
 pub DeciderMode: DeciderMode = {
-    "1" => DeciderMode::One,
-    <ident:Ident> => DeciderMode::Input(ident),
+    "!1" => DeciderMode::One,
+    "_" => DeciderMode::Passthrough,
 }
 
 pub WireColor: WireColor = {
@@ -148,6 +160,10 @@ Expr5: Expr = {
     //NumDec => Expr::Const(<>),
     NumVar => Expr::Var(<>),
     "(" <Expr1> ")",
+}
+
+ConstCond: ConstCond = {
+    <left:Expr1> <op:DeciderOp> <right:Expr1> => ConstCond { <> },
 }
 
 pub SignalVar: Ident = "$(" <Ident> ")";

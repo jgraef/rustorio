@@ -10,7 +10,7 @@ use rustorio_core::{
     types::UnitNumber,
     blueprint::{
         types::Position,
-        Blueprint, Entity, ControlBehavior, ArithmeticConditions, DeciderConditions,
+        Blueprint, Entity, ControlBehavior, ArithmeticConditions, DeciderConditions, CircuitCondition,
     },
 };
 
@@ -92,14 +92,21 @@ pub fn blueprint_from_ir(ir: &ir::Ir) -> Result<Blueprint, Error> {
         blueprint.entities.push(e);
     }
 
+    log::trace!("connections: {:#?}", connections);
+
     for conns in connections.values() {
-        for ((i, w_i, c), (j, w_j, c2)) in conns.iter().tuple_windows() {
-            assert_eq!(c, c2);
+        for ((i, w_i, c_i), (j, w_j, c_j)) in conns.iter().tuple_windows() {
+            assert_eq!(c_i, c_j);
             let en_i = blueprint.entities.get(*i).unwrap().entity_number;
             let en_j = blueprint.entities.get(*j).unwrap().entity_number;
-            connect_entities(blueprint.entities.get_mut(*i).unwrap(), *w_i, en_j, *w_j, *c);
+
+            log::trace!("connection: i={}, w_i={}, c_i={:?}", i, w_i, c_i);
+            log::trace!("connection: j={}, w_j={}, c_j={:?}", j, w_j, c_j);
+            log::trace!("connecting: entity {} to entity {}", en_i, en_j);
+
+            connect_entities(blueprint.entities.get_mut(*i).unwrap(), *w_i, en_j, *w_j, *c_i);
             // TODO: Is it enough to just encode the connection in one direction?
-            connect_entities(blueprint.entities.get_mut(*j).unwrap(), *w_j, en_i, *w_i, *c);
+            connect_entities(blueprint.entities.get_mut(*j).unwrap(), *w_j, en_i, *w_i, *c_j);
         }
     }
 
@@ -142,6 +149,15 @@ fn entity_from_ir(combinator: &ir::Combinator, position: Position, entity_number
 
             ("decider-combinator", *input_wires, *output_wires)
         },
+        ir::Combinator::Lamp(ir::Lamp { op, left, right, input_wires, use_color: _ }) => {
+            control.circuit_condition = Some(CircuitCondition {
+                first_signal: Some(left.as_signal_id().expect("LHS must be signal")),
+                constant: Some(right.as_constant().expect("RHS must be constant")),
+                comparator: op.as_op_str().to_owned(),
+            });
+
+            ("small-lamp", *input_wires, ir::Wires::default())
+        }
     };
 
     let mut entity = Entity::new(

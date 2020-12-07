@@ -69,6 +69,7 @@ impl Envelope {
     }
 
     pub fn decode(s: &str) -> Result<Self, Error> {
+        let s = s.trim();
         let version_prefix = &s[..1];
 
         if version_prefix != "0" {
@@ -169,7 +170,7 @@ pub struct Entity {
     #[serde(skip_serializing_if="Option::is_none")]
     pub orientation: Option<u8>,
 
-    #[serde(default)]
+    #[serde(skip_serializing_if="Option::is_none")]
     pub connections: Option<Connection>,
 
     #[serde(skip_serializing_if="Option::is_none")]
@@ -291,7 +292,7 @@ pub struct ControlBehavior {
     pub decider_conditions: Option<DeciderConditions>,
 
     #[serde(skip_serializing_if="Option::is_none")]
-    pub circuit_condition: Option<serde_json::Value>,
+    pub circuit_condition: Option<CircuitCondition>,
 
     #[serde(skip_serializing_if="Option::is_none")]
     pub circuit_parameters: Option<serde_json::Value>,
@@ -352,6 +353,7 @@ fn default_arith_op() -> String {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ArithmeticConditions {
     #[serde(skip_serializing_if="Option::is_none")]
     pub first_signal: Option<SignalID>,
@@ -381,6 +383,7 @@ fn bool_true() -> bool {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DeciderConditions {
     #[serde(skip_serializing_if="Option::is_none")]
     pub first_signal: Option<SignalID>,
@@ -399,6 +402,19 @@ pub struct DeciderConditions {
 
     #[serde(default="bool_true")]
     pub copy_count_from_input: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CircuitCondition {
+    #[serde(default="default_compar_op")]
+    pub comparator: String,
+
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub first_signal: Option<SignalID>,
+
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub constant: Option<i32>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

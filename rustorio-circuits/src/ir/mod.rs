@@ -25,18 +25,36 @@ pub enum WireColor {
 
 #[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Wires {
-    // ID of red wire
+    /// ID of red wire
     pub red: Option<WireId>,
-    // ID of green wire
+
+    /// ID of green wire
     pub green: Option<WireId>,
 }
 
 impl Wires {
+    pub fn with_color(color: WireColor, wire_id: WireId) -> Self {
+        let mut wires = Wires::default();
+        wires.set_color(color, wire_id);
+        wires
+    }
+
+    pub fn set_color(&mut self, color: WireColor, wire_id: WireId) -> Option<WireId> {
+        match color {
+            WireColor::Red => self.red.replace(wire_id),
+            WireColor::Green => self.green.replace(wire_id),
+        }
+    }
+
     pub fn get_color(&self, color: WireColor) -> Option<WireId> {
         match color {
             WireColor::Red => self.red,
             WireColor::Green => self.green,
         }
+    }
+
+    pub fn is_some(&self) -> bool {
+        self.red.is_some() && self.green.is_some()
     }
 }
 
@@ -206,6 +224,22 @@ impl RenameWires for DeciderCombinator {
 
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Lamp {
+    pub op: DeciderOp,
+    pub left: Input,
+    pub right: Input,
+    pub input_wires: Wires,
+    pub use_color: bool,
+}
+
+impl RenameWires for Lamp {
+    fn rename(&mut self, renamer: &mut WireRenamer) {
+        self.input_wires.rename(renamer);
+    }
+}
+
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ConstantCombinator {
     pub signals: Vec<Signal>,
     pub wires: Wires,
@@ -223,6 +257,7 @@ pub enum Combinator {
     Arithmetic(ArithmeticCombinator),
     Decider(DeciderCombinator),
     Constant(ConstantCombinator),
+    Lamp(Lamp),
 
     // TODO: Pushbutton? Nixie-tubes?
 }
@@ -233,6 +268,7 @@ impl RenameWires for Combinator {
             Combinator::Arithmetic(c) => c.rename(renamer),
             Combinator::Decider(c) => c.rename(renamer),
             Combinator::Constant(c) => c.rename(renamer),
+            Combinator::Lamp(c) => c.rename(renamer),
         }
     }
 }

@@ -8,13 +8,19 @@ A Factorio circuit toolkit that contains a circuit compiler and simulator.
 
 ## To Do
 
+ - [_] FIX: decider needs to be able to specify input wire
+ - [_] Compile-time assertions over consts?
  - [_] **Important** - Support comments
  - [_] Proper diagnostics
  - [_] Implement simulator
  - [_] Parse blueprints to IR
+ - [_] Build a better type-system over numeric constants, signal constants and wires.
 
+I think both diagnostics and comments need a custom lexer. 
 
 ## Overview
+
+To enable logging, either set the environment variable `RUST_LOG=LEVEL` in your shell, or in a file called `.env`.
 
 ### Compiler
 

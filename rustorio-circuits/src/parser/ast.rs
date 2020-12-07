@@ -124,11 +124,22 @@ pub enum Statement {
         right: Input,
         mode: DeciderMode,
     },
+    Lamp {
+        op: ir::DeciderOp,
+        left: Input,
+        right: Input,
+        //use_color: bool,
+    },
     ModuleInst {
         ident: Ident,
         generics: Option<Vec<GenericArg>>,
-        ports: Vec<PortDef>,
-    }
+        ports: Vec<PortArg>,
+    },
+    Conditional {
+        cond: ConstCond,
+        then_case: Vec<Statement>,
+        else_case: Option<Vec<Statement>>,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -175,7 +186,7 @@ impl Signal {
 #[derive(Clone, Debug)]
 pub enum DeciderMode {
     One,
-    Input(Ident),
+    Passthrough,
 }
 
 #[derive(Clone, Debug)]
@@ -185,7 +196,7 @@ pub enum GenericArg {
 }
 
 #[derive(Clone, Debug)]
-pub struct PortDef {
+pub struct PortArg {
     pub port: Ident,
     pub wire: Ident,
 }
@@ -202,27 +213,6 @@ pub enum LiteralType {
     Signal,
 }
 
-/*
-#[derive(Clone, Debug)]
-pub enum Literal {
-    Virtual(Ident),
-    Item(Ident),
-    Fluid(Ident),
-    Each,
-    All,
-    Any,
-    Number(i32),
-}
-
-impl Literal {
-    pub fn r#type(&self) -> LiteralType {
-        match self {
-            Literal::Number(_) => LiteralType::Number,
-            _ => LiteralType::Signal,
-        }
-    }
-}*/
-
 #[derive(Clone, Debug)]
 pub enum Expr {
     Add(Box<Expr>, Box<Expr>),
@@ -237,6 +227,13 @@ pub enum Expr {
     Neg(Box<Expr>),
     Const(i32),
     Var(Ident),
+}
+
+#[derive(Clone, Debug)]
+pub struct ConstCond {
+    pub left: Expr,
+    pub op: ir::DeciderOp,
+    pub right: Expr,
 }
 
 

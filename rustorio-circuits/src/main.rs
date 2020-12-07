@@ -53,7 +53,6 @@ enum Opt {
 }
 
 fn compile_to_ir(inputs: Vec<PathBuf>, mut imports: Vec<PathBuf>, root: String, params: Vec<String>) -> Result<Ir, Error> {
-
     let params = params.into_iter()
         .map(|p| p.parse())
         .collect::<Result<Vec<Param>, _>>()?;
@@ -69,10 +68,10 @@ fn compile_to_ir(inputs: Vec<PathBuf>, mut imports: Vec<PathBuf>, root: String, 
 
     let ast = parser.into_ast();
 
-    log::debug!("AST: {:#?}", ast);
+    //log::debug!("AST: {:#?}", ast);
 
     let compiler = Compiler::new(&ast);
-    let ir = compiler.compile_module(&root.into(), params)?;
+    let ir = compiler.compile_module(&root.into(), params, None)?;
 
     log::debug!("IR: {:#?}", ir);
 
