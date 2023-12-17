@@ -1,26 +1,33 @@
 use std::{
     cmp::Ordering,
-    str::FromStr
+    str::FromStr,
 };
 
-use nalgebra::{Vector2, Point2};
-use serde::{Serialize, Deserialize};
-use regex::Regex;
 use lazy_static::lazy_static;
-use parse_display::{Display, FromStr};
+use nalgebra::{
+    Point2,
+    Vector2,
+};
+use parse_display::{
+    Display,
+    FromStr,
+};
+use regex::Regex;
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 use crate::blueprint::Error;
 
-
-// TODO: These are referred to by the Factorio Lua API as "Concepts". So maybe move this to `rustorio_core::concepts`.
-//       The Position type might also just be a `Vector2<f32>`, but we need a custom serialization.
-
+// TODO: These are referred to by the Factorio Lua API as "Concepts". So maybe
+// move this to `rustorio_core::concepts`.       The Position type might also
+// just be a `Vector2<f32>`, but we need a custom serialization.
 
 lazy_static! {
     // TODO Where does this format come from?
     static ref SIGNAL_REGEX: Regex = Regex::new(r"([a-z0-9-]+)=([a-z0-9-]+):(\d+)").unwrap();
 }
-
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Position {
@@ -38,17 +45,14 @@ impl From<Point2<f32>> for Position {
     fn from(point: Point2<f32>) -> Self {
         Self {
             x: point.x,
-            y: point.y
+            y: point.y,
         }
     }
 }
 
 impl From<Position> for Point2<f32> {
     fn from(position: Position) -> Self {
-        Point2::new(
-            position.x,
-            position.y
-        )
+        Point2::new(position.x, position.y)
     }
 }
 
@@ -56,23 +60,33 @@ impl From<Vector2<f32>> for Position {
     fn from(vector: Vector2<f32>) -> Self {
         Self {
             x: vector.x,
-            y: vector.y
+            y: vector.y,
         }
     }
 }
 
 impl From<Position> for Vector2<f32> {
     fn from(position: Position) -> Self {
-        Vector2::new(
-            position.x,
-            position.y
-        )
+        Vector2::new(position.x, position.y)
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Display, FromStr, PartialOrd, Ord)]
-#[serde(rename_all="lowercase")]
-#[display(style="lowercase")]
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    Display,
+    FromStr,
+    PartialOrd,
+    Ord,
+)]
+#[serde(rename_all = "lowercase")]
+#[display(style = "lowercase")]
 pub enum SignalType {
     Item,
     Fluid,
@@ -99,17 +113,15 @@ impl FromStr for SignalID {
         let r#type = parts.next().unwrap().parse().map_err(|_| e())?;
         let name = parts.next().ok_or_else(e)?.to_owned();
 
-        Ok(Self {
-            r#type,
-            name,
-        })
+        Ok(Self { r#type, name })
     }
 }
 
 // TODO: Isn't that the same as when we derive Ord?
 impl Ord for SignalID {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.r#type.cmp(&other.r#type)
+        self.r#type
+            .cmp(&other.r#type)
             .then_with(|| self.name.cmp(&other.name))
     }
 }
@@ -122,10 +134,7 @@ impl PartialOrd for SignalID {
 
 impl SignalID {
     pub fn new(r#type: SignalType, name: String) -> Self {
-        Self {
-            r#type,
-            name,
-        }
+        Self { r#type, name }
     }
 
     pub fn new_item(name: String) -> Self {
@@ -208,7 +217,7 @@ impl Signal {
         Self {
             r#type,
             name,
-            count
+            count,
         }
     }
 
@@ -227,8 +236,7 @@ impl Signal {
     pub fn into_signal(self) -> SignalID {
         SignalID {
             name: self.name,
-            r#type: self.r#type
+            r#type: self.r#type,
         }
     }
 }
-

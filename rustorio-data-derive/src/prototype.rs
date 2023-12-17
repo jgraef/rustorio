@@ -1,11 +1,27 @@
-use proc_macro2::{TokenStream, Literal};
-use syn::{Data, Path, parse_str};
-use darling::{FromMeta, FromDeriveInput};
-use heck::{KebabCase, SnekCase};
-use quote::{format_ident, quote};
+use darling::{
+    FromDeriveInput,
+    FromMeta,
+};
+use heck::{
+    ToKebabCase,
+    ToSnekCase,
+};
+use proc_macro2::{
+    Literal,
+    TokenStream,
+};
+use quote::{
+    format_ident,
+    quote,
+};
+use syn::{
+    parse_str,
+    Data,
+    Path,
+};
 
 #[derive(Debug, FromMeta, Default)]
-pub(crate) struct ContainerAttributes  {
+pub(crate) struct ContainerAttributes {
     inherits: Option<String>,
     r#abstract: bool,
 }
@@ -18,8 +34,6 @@ pub(crate) struct DeriveOptions {
     #[darling(default)]
     prototype: ContainerAttributes,
 }
-
-
 
 pub(crate) fn impl_prototype(_data: Data, options: DeriveOptions) -> TokenStream {
     let struct_ident = options.ident;

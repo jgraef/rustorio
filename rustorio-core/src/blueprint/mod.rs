@@ -1,23 +1,37 @@
 pub mod types;
 
 use std::{
-    str::FromStr,
     collections::BTreeMap,
+    str::FromStr,
 };
 
-use serde::{Serialize, Deserialize};
-use thiserror::Error;
+use base64::Engine;
 use libflate::zlib;
-use parse_display::{FromStr, Display};
+use parse_display::{
+    Display,
+    FromStr,
+};
+use serde::{
+    Deserialize,
+    Serialize,
+};
+use thiserror::Error;
 
 use crate::{
-    types::{Color, ItemStackIndex, ItemCountType, UnitNumber},
-    blueprint::types::{Position, SignalID, Signal},
+    blueprint::types::{
+        Position,
+        Signal,
+        SignalID,
+    },
+    types::{
+        Color,
+        ItemCountType,
+        ItemStackIndex,
+        UnitNumber,
+    },
 };
 
-
 pub const DEFAULT_VERSION: u64 = 0x1000100030001;
-
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -34,12 +48,16 @@ pub enum Error {
     Zlib(std::io::Error),
 }
 
+const BASE64: base64::engine::GeneralPurpose = base64::engine::GeneralPurpose::new(
+    &base64::alphabet::STANDARD,
+    base64::engine::GeneralPurposeConfig::new().with_encode_padding(true),
+);
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all="kebab-case", deny_unknown_fields)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub enum Envelope {
     Blueprint(Blueprint),
-    BlueprintBook(BlueprintBook)
+    BlueprintBook(BlueprintBook),
 }
 
 impl FromStr for Envelope {
@@ -55,15 +73,16 @@ impl Envelope {
         //println!("{:#?}", serde_json::to_value(self.clone()));
         //todo!();
 
-        let mut zlib_encoder = zlib::Encoder::new(vec![])
-            .map_err(|e| Error::Zlib(e))?;
+        let mut zlib_encoder = zlib::Encoder::new(vec![]).map_err(|e| Error::Zlib(e))?;
         serde_json::to_writer(&mut zlib_encoder, &self)?;
 
-        let compressed = zlib_encoder.finish().into_result()
+        let compressed = zlib_encoder
+            .finish()
+            .into_result()
             .map_err(|e| Error::Zlib(e))?;
 
         let mut bp_string = String::from("0");
-        base64::encode_config_buf(&compressed, base64::Config::new(base64::CharacterSet::Standard, true), &mut bp_string);
+        BASE64.encode_string(&compressed, &mut bp_string);
 
         Ok(bp_string)
     }
@@ -76,9 +95,8 @@ impl Envelope {
             return Err(Error::IncorrectVersionPrefix(version_prefix.to_owned()));
         }
 
-        let compressed = base64::decode(&s[1..])?;
-        let zlib_decoder = zlib::Decoder::new(&compressed[..])
-            .map_err(|e| Error::Zlib(e))?;
+        let compressed = BASE64.decode(&s[1..])?;
+        let zlib_decoder = zlib::Decoder::new(&compressed[..]).map_err(|e| Error::Zlib(e))?;
 
         //let value: serde_json::Value = serde_json::from_reader(zlib_decoder)?;
         //println!("{:#?}", value);
@@ -88,16 +106,15 @@ impl Envelope {
     }
 }
 
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct BlueprintBook {
     pub item: String,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub label_color: Option<Color>,
 
     pub blueprints: BTreeMap<usize, Blueprint>,
@@ -112,22 +129,22 @@ pub struct BlueprintBook {
 pub struct Blueprint {
     pub item: String,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub label_color: Option<Color>,
 
-    #[serde(default, skip_serializing_if="Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub entities: Vec<Entity>,
 
-    #[serde(default, skip_serializing_if="Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tiles: Vec<Tile>,
 
-    #[serde(default, skip_serializing_if="Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub icons: Vec<Icon>,
 
-    #[serde(default, skip_serializing_if="Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub schedules: Vec<Schedule>,
 
     pub version: u64,
@@ -164,82 +181,82 @@ pub struct Entity {
 
     pub position: Position,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub direction: Option<u8>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub orientation: Option<u8>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub connections: Option<Connection>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub control_behavior: Option<ControlBehavior>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub items: Option<BTreeMap<String, u32>>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub recipe: Option<String>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bar: Option<u32>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub inventory: Option<Inventory>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub infinity_settings: Option<InfinitySettings>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub r#type: Option<String>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub input_priority: Option<SplitterPriority>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub output_priority: Option<SplitterPriority>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub filter: Option<String>,
 
     #[serde(default)]
     pub filters: Vec<ItemFilter>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub filter_mode: Option<FilterMode>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub override_stack_size: Option<u8>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub drop_position: Option<Position>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub pickup_position: Option<Position>,
 
-    #[serde(default, skip_serializing_if="Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub request_filters: Vec<RequestFilter>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub request_from_buffers: Option<bool>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub parameters: Option<SpeakerParameter>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub alert_parameters: Option<SpeakerAlertParameter>, // TODO
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub auto_launch: Option<bool>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub variation: Option<u8>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub color: Option<Color>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub station: Option<String>,
 }
 
@@ -274,7 +291,7 @@ impl Entity {
             auto_launch: None,
             variation: None,
             color: None,
-            station: None
+            station: None,
         }
     }
 }
@@ -282,46 +299,43 @@ impl Entity {
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ControlBehavior {
-    #[serde(default, skip_serializing_if="Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub filters: Vec<SignalFilter>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub arithmetic_conditions: Option<ArithmeticConditions>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub decider_conditions: Option<DeciderConditions>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub circuit_condition: Option<CircuitCondition>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub circuit_parameters: Option<serde_json::Value>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub read_logistics: Option<serde_json::Value>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub read_robot_stats: Option<serde_json::Value>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub read_from_train: Option<serde_json::Value>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub read_stopped_train: Option<serde_json::Value>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub train_stopped_signal: Option<serde_json::Value>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub circuit_mode_of_operation: Option<u8>,
 }
 
 impl ControlBehavior {
     pub fn add_filter(&mut self, signal: Signal) {
-        let last_index = self.filters
-            .last()
-            .map(|f| f.index)
-            .unwrap_or_default();
+        let last_index = self.filters.last().map(|f| f.index).unwrap_or_default();
 
         self.filters.push(SignalFilter {
             signal: SignalID::new(signal.r#type, signal.name),
@@ -331,7 +345,8 @@ impl ControlBehavior {
     }
 
     pub fn match_filters<F>(&mut self, signal_id: &SignalID, mut f: F)
-        where F: FnMut(&mut ControlBehavior)
+    where
+        F: FnMut(&mut ControlBehavior),
     {
         let mut matched = false;
 
@@ -355,22 +370,22 @@ fn default_arith_op() -> String {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ArithmeticConditions {
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub first_signal: Option<SignalID>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub second_signal: Option<SignalID>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub first_constant: Option<i32>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub second_constant: Option<i32>,
 
-    #[serde(default="default_arith_op")]
+    #[serde(default = "default_arith_op")]
     pub operation: String,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub output_signal: Option<SignalID>,
 }
 
@@ -385,35 +400,35 @@ fn bool_true() -> bool {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DeciderConditions {
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub first_signal: Option<SignalID>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub second_signal: Option<SignalID>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub constant: Option<i32>,
 
-    #[serde(default="default_compar_op")]
+    #[serde(default = "default_compar_op")]
     pub comparator: String,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub output_signal: Option<SignalID>,
 
-    #[serde(default="bool_true")]
+    #[serde(default = "bool_true")]
     pub copy_count_from_input: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CircuitCondition {
-    #[serde(default="default_compar_op")]
+    #[serde(default = "default_compar_op")]
     pub comparator: String,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub first_signal: Option<SignalID>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub constant: Option<i32>,
 }
 
@@ -428,20 +443,20 @@ pub struct RequestFilter {
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Connection {
-    #[serde(rename="1")]
+    #[serde(rename = "1")]
     pub first: ConnectionPoint,
 
-    #[serde(rename="2", skip_serializing_if="Option::is_none")]
+    #[serde(rename = "2", skip_serializing_if = "Option::is_none")]
     pub second: Option<ConnectionPoint>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ConnectionPoint {
-    #[serde(default, skip_serializing_if="Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub red: Vec<ConnectionData>,
 
-    #[serde(default, skip_serializing_if="Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub green: Vec<ConnectionData>,
 }
 
@@ -450,18 +465,18 @@ pub struct ConnectionPoint {
 pub struct ConnectionData {
     pub entity_id: UnitNumber,
 
-    // Defined by `defines.circuit_connector_id`. Currently (Factorio 1.1) this is always 1, except for a combinator
-    // output it is 2.
-    #[serde(skip_serializing_if="Option::is_none")]
+    // Defined by `defines.circuit_connector_id`. Currently (Factorio 1.1) this is always 1, except
+    // for a combinator output it is 2.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub circuit_id: Option<u8>, // TODO: What's this?
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Cables {
-    #[serde(default, skip_serializing_if="Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub red: Vec<Connection>,
-    #[serde(default, skip_serializing_if="Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub green: Vec<Connection>,
 }
 
@@ -482,14 +497,14 @@ pub struct SignalFilter {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum FilterMode {
-    #[serde(rename="blacklist")]
+    #[serde(rename = "blacklist")]
     Deny,
-    #[serde(rename="whitelist")]
+    #[serde(rename = "whitelist")]
     Allow,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all="lowercase")]
+#[serde(rename_all = "lowercase")]
 pub enum SplitterPriority {
     Left,
     Right,
@@ -498,9 +513,9 @@ pub enum SplitterPriority {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Inventory {
-    #[serde(skip_serializing_if="Vec::is_empty")]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub filters: Vec<ItemFilter>,
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bar: Option<ItemStackIndex>,
 }
 
@@ -509,7 +524,7 @@ pub struct Inventory {
 pub struct InfinitySettings {
     pub remove_unfiltered_items: bool,
 
-    #[serde(skip_serializing_if="Vec::is_empty")]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub filters: Vec<InfinityFilter>,
 }
 
@@ -523,11 +538,11 @@ pub struct InfinityFilter {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all="kebab-case")]
+#[serde(rename_all = "kebab-case")]
 pub enum InfinityFilterMode {
     AtLeast,
     AtMost,
-    Exactly
+    Exactly,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -551,7 +566,7 @@ pub struct SpeakerAlertParameter {
     #[serde(default)]
     pub show_on_map: bool,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub icon_signal_id: Option<SignalID>,
 
     #[serde(default)]
@@ -568,10 +583,10 @@ pub struct Tile {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Schedule {
-    #[serde(default, skip_serializing_if="Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub schedule: Vec<ScheduleRecord>,
 
-    #[serde(default, skip_serializing_if="Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub locomotives: Vec<UnitNumber>,
 }
 
@@ -580,8 +595,8 @@ pub struct Schedule {
 pub struct ScheduleRecord {
     pub station: String,
 
-    #[serde(default, skip_serializing_if="Vec::is_empty")]
-    pub wait_conditions: Vec<WaitCondition>
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub wait_conditions: Vec<WaitCondition>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -589,19 +604,19 @@ pub struct ScheduleRecord {
 pub struct WaitCondition {
     pub r#type: WaitConditionType,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub compare_type: Option<WaitConditionCompareType>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ticks: Option<u64>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub condition: Option<serde_json::Value>, // TODO
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, FromStr, Display)]
-#[serde(rename_all="snake_case")]
-#[display(style="snake_case")]
+#[serde(rename_all = "snake_case")]
+#[display(style = "snake_case")]
 pub enum WaitConditionType {
     Time,
     Inactivity,
@@ -616,13 +631,12 @@ pub enum WaitConditionType {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, FromStr, Display)]
-#[serde(rename_all="lowercase")]
-#[display(style="lowercase")]
+#[serde(rename_all = "lowercase")]
+#[display(style = "lowercase")]
 pub enum WaitConditionCompareType {
     And,
-    Or
+    Or,
 }
-
 
 #[cfg(test)]
 mod tests {

@@ -3,8 +3,8 @@
   "version": "0.0.1",
   "title": "Remote Control",
   "author": "Janosch Gräf",
-  "contact": "https://github.com/jgraef/factorio-remote/issues",
-  "homepage": "https://github.com/jgraef/factorio-remote",
+  "contact": "https://github.com/jgraef/rustorio/issues",
+  "homepage": "https://github.com/rustorio",
   "factorio_version": "1.1",
   "dependencies": ["base >= 0.18", "janosch-lib >= 0.0.1"]
 }

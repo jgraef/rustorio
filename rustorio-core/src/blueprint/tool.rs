@@ -1,18 +1,15 @@
 use std::{
+    fs::read_to_string,
     path::PathBuf,
-    fs::read_to_string
 };
 
-use rustorio_core::blueprint::Envelope;
-
-use structopt::StructOpt;
 use anyhow::Error;
+use rustorio_core::blueprint::Envelope;
+use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
 enum Opt {
-    Show {
-        input: PathBuf,
-    },
+    Show { input: PathBuf },
 }
 
 fn main() -> Result<(), Error> {

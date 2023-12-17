@@ -1,18 +1,18 @@
 [package]
 name = "rustorio-data"
 version = "0.1.0"
-authors = ["Janosch Gräf <janosch@nimiq.com>"]
-edition = "2018"
+authors = ["Janosch Gräf <janosch.graef@gmail.com>"]
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-mlua = { version = "0.4", features = ["lua52"] }
+mlua = { version = "0.9", features = ["lua52"] }
 thiserror = "1.0"
 serde = { version = "1.0", features = ["derive"], optional = true }
 derive_more = "0.99"
-nalgebra = { version = "0.23", optional = true }
-palette = { version = "0.5.0", optional = true }
+nalgebra = { version = "0.32", optional = true }
+palette = { version = "0.7", optional = true }
 log = "0.4"
 
 [features]

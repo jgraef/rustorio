@@ -1,9 +1,11 @@
 use factorio_remote::{
     error::Error,
-    types::{SignalType, Signal},
+    types::{
+        Signal,
+        SignalType,
+    },
     FactorioRemote,
 };
-
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -15,10 +17,15 @@ async fn main() -> Result<(), Error> {
     let remote = FactorioRemote::connect_env().await?;
 
     // Send some signals on channel 1
-    remote.send_signals(1, &[
-        Signal::new("iron-plate".to_owned(), SignalType::Item, 40),
-        Signal::new("signal-A".to_owned(), SignalType::Virtual, 1337),
-    ]).await?;
+    remote
+        .send_signals(
+            1,
+            &[
+                Signal::new("iron-plate".to_owned(), SignalType::Item, 40),
+                Signal::new("signal-A".to_owned(), SignalType::Virtual, 1337),
+            ],
+        )
+        .await?;
 
     Ok(())
 }

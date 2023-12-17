@@ -1,9 +1,16 @@
 use factorio_remote::{
     error::Error,
-    types::{TrainSchedule, TrainScheduleRecord, WaitCondition, CircuitCondition, WaitConditionType, SignalID, SignalType},
+    types::{
+        CircuitCondition,
+        SignalID,
+        SignalType,
+        TrainSchedule,
+        TrainScheduleRecord,
+        WaitCondition,
+        WaitConditionType,
+    },
     FactorioRemote,
 };
-
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -14,34 +21,39 @@ async fn main() -> Result<(), Error> {
     // Alternatively use `RemoteIO::connect(hostname, password)`.
     let remote = FactorioRemote::connect_env().await?;
 
-
     let mut train_schedule = TrainSchedule::default();
 
     train_schedule.records.push(TrainScheduleRecord::station(
         "Station A",
-        WaitCondition::single(WaitConditionType::ItemCount { condition: CircuitCondition {
-            comparator: ">".to_owned(),
-            first_signal: SignalID {
-                name: "iron-ore".to_string(),
-                ty: SignalType::Item,
+        WaitCondition::single(WaitConditionType::ItemCount {
+            condition: CircuitCondition {
+                comparator: ">".to_owned(),
+                first_signal: SignalID {
+                    name: "iron-ore".to_string(),
+                    ty: SignalType::Item,
+                },
+                second_signal: None,
+                constant: Some(2000),
             },
-            second_signal: None,
-            constant: Some(2000)
-        } }),
-        false
+        }),
+        false,
     ));
     train_schedule.records.push(TrainScheduleRecord::station(
         "Station B",
         WaitCondition::single(WaitConditionType::Empty),
-        false
+        false,
     ));
     train_schedule.records.push(TrainScheduleRecord::rail(
-        -93., -3.,
+        -93.,
+        -3.,
         WaitCondition::single(WaitConditionType::Time { ticks: 120 }),
         false,
     ));
 
-    println!("Current train schedule {:#?}", remote.get_train_schedule(1).await?);
+    println!(
+        "Current train schedule {:#?}",
+        remote.get_train_schedule(1).await?
+    );
     println!("Our train schedule: {:#?}", train_schedule);
 
     remote.set_train_schedule(1, &train_schedule).await?;

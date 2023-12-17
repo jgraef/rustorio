@@ -3,7 +3,6 @@ use factorio_remote::{
     FactorioRemote,
 };
 
-
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     dotenv::dotenv().ok();

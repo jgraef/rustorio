@@ -1,10 +1,8 @@
 use thiserror::Error;
 
-
 fn start_of_string(s: &str) -> &str {
     &s[0..10]
 }
-
 
 #[derive(Debug, Error)]
 pub enum Error {

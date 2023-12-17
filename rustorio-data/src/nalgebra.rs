@@ -1,12 +1,26 @@
-use nalgebra::{Vector2, Point2, Vector3, Point3, Scalar};
+use mlua::{
+    Table,
+    Value,
+};
+use nalgebra::{
+    Point2,
+    Point3,
+    Scalar,
+    Vector2,
+    Vector3,
+};
 
-use crate::{FromLuaTable, FromLuaValue, Error, to_option, to_result};
-use mlua::{Value, Table};
-
-
+use crate::{
+    to_option,
+    to_result,
+    Error,
+    FromLuaTable,
+    FromLuaValue,
+};
 
 impl<T> FromLuaTable for Vector2<T>
-    where T: Scalar + FromLuaValue
+where
+    T: Scalar + FromLuaValue,
 {
     fn from_lua_table(table: Table) -> Result<Self, Error> {
         let err = || Error::other("Expected either `x` and `y` or array of length 2");
@@ -26,16 +40,17 @@ impl<T> FromLuaTable for Vector2<T>
 }
 
 impl<T> FromLuaTable for Point2<T>
-    where T: Scalar + FromLuaValue
+where
+    T: Scalar + FromLuaValue,
 {
     fn from_lua_table(table: Table) -> Result<Self, Error> {
         Ok(Point2::from(Vector2::from_lua_table(table)?))
     }
 }
 
-
 impl<T> FromLuaTable for Vector3<T>
-    where T: Scalar + FromLuaValue
+where
+    T: Scalar + FromLuaValue,
 {
     fn from_lua_table(table: Table) -> Result<Self, Error> {
         let err = || Error::other("Expected either `x`, `y`, `z` or array of length 3");
@@ -57,10 +72,10 @@ impl<T> FromLuaTable for Vector3<T>
 }
 
 impl<T> FromLuaTable for Point3<T>
-    where T: Scalar + FromLuaValue
+where
+    T: Scalar + FromLuaValue,
 {
     fn from_lua_table(table: Table) -> Result<Self, Error> {
         Ok(Point3::from(Vector3::from_lua_table(table)?))
     }
 }
-

@@ -1,21 +1,40 @@
-use std::fmt::{self, Display, Formatter};
+use std::fmt::{
+    self,
+    Display,
+    Formatter,
+};
 
 use cursive::{
     direction::Direction,
-    event::{Event, EventResult},
-    traits::{Boxable, Identifiable, View},
+    event::{
+        Event,
+        EventResult,
+    },
+    traits::View,
+    view::{
+        CannotFocus,
+        Nameable,
+        Resizable,
+    },
     views::Dialog,
-    Cursive, Printer, Vec2,
+    Cursive,
+    CursiveExt,
+    Printer,
+    Vec2,
 };
-
-use cursive_tree_view::{Placement, TreeView};
-
+use cursive_tree_view::{
+    Placement,
+    TreeView,
+};
 use rustorio_core::{
     error::Error,
     mod_loader::ModLoader,
 };
-use rustorio_data::value::{Value, Table, Key};
-
+use rustorio_data::value::{
+    Key,
+    Table,
+    Value,
+};
 
 #[derive(Debug)]
 enum Item {
@@ -29,7 +48,16 @@ impl Display for Item {
         match self {
             Item::Root => write!(f, "data.raw"),
             Item::Node(key) => write!(f, "{:?}: Table", key),
-            Item::Leaf(key, value) => write!(f, "{:?}: {:?} = {:?}: {:?}", key, key.ty(), value, value.ty()),
+            Item::Leaf(key, value) => {
+                write!(
+                    f,
+                    "{:?}: {:?} = {:?}: {:?}",
+                    key,
+                    key.ty(),
+                    value,
+                    value.ty()
+                )
+            }
         }
     }
 }
@@ -40,7 +68,9 @@ struct PrototypeTree {
 
 impl Default for PrototypeTree {
     fn default() -> Self {
-        Self { view: TreeView::new() }
+        Self {
+            view: TreeView::new(),
+        }
     }
 }
 
@@ -48,7 +78,10 @@ impl PrototypeTree {
     pub fn fill(&mut self, data: Value) {
         match data {
             Value::Table(root) => {
-                let row = self.view.insert_item(Item::Root, Placement::LastChild, 0).unwrap();
+                let row = self
+                    .view
+                    .insert_item(Item::Root, Placement::LastChild, 0)
+                    .unwrap();
                 self.fill_children(root, row, 1)
             }
             _ => panic!("Root must be a table"),
@@ -63,12 +96,16 @@ impl PrototypeTree {
         for (key, value) in table {
             match value {
                 Value::Table(table) => {
-                    let row = self.view.insert_item(Item::Node(key), Placement::LastChild, parent).unwrap();
+                    let row = self
+                        .view
+                        .insert_item(Item::Node(key), Placement::LastChild, parent)
+                        .unwrap();
                     self.fill_children(table, row, depth + 1);
                     self.view.collapse_item(row);
                 }
                 value => {
-                    self.view.insert_item(Item::Leaf(key, value), Placement::LastChild, parent);
+                    self.view
+                        .insert_item(Item::Leaf(key, value), Placement::LastChild, parent);
                 }
             }
         }
@@ -92,7 +129,7 @@ impl View for PrototypeTree {
         self.view.on_event(event)
     }
 
-    fn take_focus(&mut self, direction: Direction) -> bool {
+    fn take_focus(&mut self, direction: Direction) -> Result<EventResult, CannotFocus> {
         self.view.take_focus(direction)
     }
 }
@@ -161,7 +198,11 @@ fn main() -> Result<(), Error> {
     let mut tree = PrototypeTree::default();
     tree.fill(data_raw);
 
-    siv.add_layer(Dialog::around(tree.with_name("tree")).title("data.raw").full_screen());
+    siv.add_layer(
+        Dialog::around(tree.with_name("tree"))
+            .title("data.raw")
+            .full_screen(),
+    );
 
     siv.run();
 

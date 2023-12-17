@@ -1,37 +1,54 @@
-pub mod request;
 pub mod error;
+pub mod request;
 
 use std::{
     collections::BTreeMap,
     convert::TryInto,
+    env,
     sync::Arc,
-    env
 };
 
+pub use factorio_data::types;
+use factorio_data::types::{
+    ChannelId,
+    Color,
+    Position,
+    RadarData,
+    Screenshot,
+    Signal,
+    SignalID,
+    TrainSchedule,
+    UnitNumber,
+};
+use log::Level;
 use rcon::Connection;
 use tokio::{
     net::ToSocketAddrs,
     sync::RwLock,
 };
-use log::Level;
-
-use factorio_data::types::{ChannelId, Color, SignalID, Signal, TrainSchedule, UnitNumber, RadarData, Position, Screenshot};
-pub use factorio_data::types;
 
 use crate::{
     error::Error,
     request::{
-        Request, PrintRequest, GetAvailableSignalsRequest, SendSignalsRequest, ReceiveSignalsRequest,
-        ImportBlueprintRequest, ImportBlueprintResult, SetTrainScheduleRequest,
-        GetTrainScheduleRequest, GetRadarRequest, PacketCodec, PingRequest, GetRadarScreenshotsRequest,
+        GetAvailableSignalsRequest,
+        GetRadarRequest,
+        GetRadarScreenshotsRequest,
+        GetTrainScheduleRequest,
+        ImportBlueprintRequest,
+        ImportBlueprintResult,
+        PacketCodec,
+        PingRequest,
+        PrintRequest,
+        ReceiveSignalsRequest,
+        Request,
+        SendSignalsRequest,
+        SetTrainScheduleRequest,
     },
 };
-
 
 pub trait LogHandler {
     fn on_log_line(&mut self, line: &str) -> Result<(), Error>;
 }
-
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct LoggingLogHandler {
@@ -66,14 +83,15 @@ struct Inner {
     //log_handler: Box<dyn LogHandler + Send>,
 }
 
-
 pub struct FactorioRemote {
     inner: Arc<RwLock<Inner>>,
 }
 
 impl Clone for FactorioRemote {
     fn clone(&self) -> Self {
-        Self { inner: Arc::clone(&self.inner) }
+        Self {
+            inner: Arc::clone(&self.inner),
+        }
     }
 }
 
@@ -86,26 +104,31 @@ impl FactorioRemote {
         Self::connect(address, &password, &mod_name).await
     }
 
-    pub async fn connect<A: ToSocketAddrs>(address: A, password: &str, mod_name: &str) -> Result<Self, Error> {
+    pub async fn connect<A: ToSocketAddrs>(
+        address: A,
+        password: &str,
+        mod_name: &str,
+    ) -> Result<Self, Error> {
         let connection = Connection::builder()
             .enable_factorio_quirks(true)
-            .connect(address, password).await?;
+            .connect(address, password)
+            .await?;
 
         let remote = Self {
             inner: Arc::new(RwLock::new(Inner {
                 connection,
                 //mod_name: mod_name.to_owned(),
                 //log_handler: Box::new(LoggingLogHandler { level: Level::Debug }),
-                packet_codec: PacketCodec::new(mod_name)
-            }))
+                packet_codec: PacketCodec::new(mod_name),
+            })),
         };
 
         let pong = remote.ping(420).await?;
-        if  pong != 420 {
+        if pong != 420 {
             return Err(Error::IncorrectPong {
                 expected: 420,
                 got: pong,
-            })
+            });
         }
 
         Ok(remote)
@@ -120,7 +143,9 @@ impl FactorioRemote {
         // TODO: Use log handler
         //let _ = &self.inner.log_handler;
 
-        let response = inner.packet_codec.decode_response_from_mod::<R>(&response_data)?;
+        let response = inner
+            .packet_codec
+            .decode_response_from_mod::<R>(&response_data)?;
         Ok(response)
     }
 
@@ -133,23 +158,49 @@ impl FactorioRemote {
     }
 
     pub async fn send_signals(&self, channel: ChannelId, signals: &[Signal]) -> Result<(), Error> {
-        self.send_request(&SendSignalsRequest { channel, signals }).await
+        self.send_request(&SendSignalsRequest { channel, signals })
+            .await
     }
 
     pub async fn receive_signals(&self, channel: ChannelId) -> Result<Vec<Signal>, Error> {
-        Ok(self.send_request(&ReceiveSignalsRequest { channel }).await?.into())
+        Ok(self
+            .send_request(&ReceiveSignalsRequest { channel })
+            .await?
+            .into())
     }
 
-    pub async fn import_blueprint(&self, channel: ChannelId, blueprint_data: &str) -> Result<ImportBlueprintResult, Error> {
-        Ok(self.send_request(&ImportBlueprintRequest { channel, blueprint_data } ).await?.try_into()?)
+    pub async fn import_blueprint(
+        &self,
+        channel: ChannelId,
+        blueprint_data: &str,
+    ) -> Result<ImportBlueprintResult, Error> {
+        Ok(self
+            .send_request(&ImportBlueprintRequest {
+                channel,
+                blueprint_data,
+            })
+            .await?
+            .try_into()?)
     }
 
-    pub async fn get_train_schedule(&self, channel: ChannelId) -> Result<BTreeMap<UnitNumber, TrainSchedule>, Error> {
-        self.send_request(&GetTrainScheduleRequest { channel }).await
+    pub async fn get_train_schedule(
+        &self,
+        channel: ChannelId,
+    ) -> Result<BTreeMap<UnitNumber, TrainSchedule>, Error> {
+        self.send_request(&GetTrainScheduleRequest { channel })
+            .await
     }
 
-    pub async fn set_train_schedule(&self, channel: ChannelId, train_schedule: &TrainSchedule) -> Result<(), Error> {
-        self.send_request(&SetTrainScheduleRequest { channel, train_schedule }).await
+    pub async fn set_train_schedule(
+        &self,
+        channel: ChannelId,
+        train_schedule: &TrainSchedule,
+    ) -> Result<(), Error> {
+        self.send_request(&SetTrainScheduleRequest {
+            channel,
+            train_schedule,
+        })
+        .await
     }
 
     pub async fn get_radar(&self, channel: ChannelId) -> Result<Vec<RadarData>, Error> {
@@ -160,22 +211,25 @@ impl FactorioRemote {
         // 22.5, 27.5
 
         // TODO: Move to signals connected to radar?
-        let zoom = 0.8;//3 chunks,
+        let zoom = 0.8; //3 chunks,
         let offset = Position::new(-9.5 + 64., 5.5 - 64.);
-        Ok(self.send_request(&GetRadarScreenshotsRequest {
-            channel,
-            file_name: format!("radar-%d-%s-%s.png"),
-            surface: "nauvis".to_string(),
-            resolution: Position{ x: 4096., y: 4096. },
-            offset,
-            zoom,
-        }).await?.into_vec())
+        Ok(self
+            .send_request(&GetRadarScreenshotsRequest {
+                channel,
+                file_name: format!("radar-%d-%s-%s.png"),
+                surface: "nauvis".to_string(),
+                resolution: Position { x: 4096., y: 4096. },
+                offset,
+                zoom,
+            })
+            .await?
+            .into_vec())
     }
 
     pub async fn ping<T>(&self, t: T) -> Result<T, Error>
-        where T: serde::ser::Serialize + for<'de> serde::de::Deserialize<'de> + std::fmt::Debug
+    where
+        T: serde::ser::Serialize + for<'de> serde::de::Deserialize<'de> + std::fmt::Debug,
     {
         Ok(self.send_request(&PingRequest { cookie: t }).await?)
     }
 }
-

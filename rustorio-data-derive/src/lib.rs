@@ -3,10 +3,13 @@
 mod lua;
 mod prototype;
 
-use proc_macro::TokenStream;
-use syn::{parse_macro_input, DeriveInput, Data};
 use darling::FromDeriveInput;
-
+use proc_macro::TokenStream;
+use syn::{
+    parse_macro_input,
+    Data,
+    DeriveInput,
+};
 
 #[proc_macro_derive(FromLuaTable, attributes(lua))]
 pub fn derive_from_lua_table(item: TokenStream) -> TokenStream {

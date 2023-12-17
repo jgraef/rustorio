@@ -1,5 +1,9 @@
 use std::{
-    fmt::{Display, Formatter, Result as FormatResult},
+    fmt::{
+        Display,
+        Formatter,
+        Result as FormatResult,
+    },
     str::FromStr,
 };
 
@@ -24,7 +28,11 @@ pub struct Version {
 
 impl Version {
     pub fn new(major: u16, minor: u16, patch: u16) -> Self {
-        Self { major, minor, patch }
+        Self {
+            major,
+            minor,
+            patch,
+        }
     }
 }
 
@@ -35,11 +43,27 @@ impl FromStr for Version {
         let err = || VersionParseError(s.to_owned());
 
         if let Some(captures) = REGEX.captures(s) {
-            let major = captures.get(1).ok_or_else(err)?.as_str().parse().map_err(|_| err())?;
-            let minor = captures.get(2).ok_or_else(err)?.as_str().parse().map_err(|_| err())?;
-            let patch = captures.get(4).map(|m| m.as_str().parse()).transpose().map_err(|_| err())?.unwrap_or_default();
+            let major = captures
+                .get(1)
+                .ok_or_else(err)?
+                .as_str()
+                .parse()
+                .map_err(|_| err())?;
+            let minor = captures
+                .get(2)
+                .ok_or_else(err)?
+                .as_str()
+                .parse()
+                .map_err(|_| err())?;
+            let patch = captures
+                .get(4)
+                .map(|m| m.as_str().parse())
+                .transpose()
+                .map_err(|_| err())?
+                .unwrap_or_default();
             Ok(Version::new(major, minor, patch))
-        } else {
+        }
+        else {
             Err(err())
         }
     }

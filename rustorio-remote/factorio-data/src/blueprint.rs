@@ -1,17 +1,26 @@
 use std::{
+    collections::HashMap,
     io::Cursor,
     str::FromStr,
-    collections::HashMap,
 };
 
 use libflate::zlib;
-use serde::{Serialize, Deserialize};
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 use crate::{
     error::Error,
-    types::{UnitNumber, Position, SignalID, Signal, Color, SignalType},
+    types::{
+        Color,
+        Position,
+        Signal,
+        SignalID,
+        SignalType,
+        UnitNumber,
+    },
 };
-
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -31,16 +40,16 @@ pub struct RequestFilter {
 #[serde(deny_unknown_fields)]
 pub struct Connection {
     entity_id: UnitNumber,
-    #[serde(default, skip_serializing_if="Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     circuit_id: Option<UnitNumber>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Cables {
-    #[serde(default, skip_serializing_if="Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub red: Vec<Connection>,
-    #[serde(default, skip_serializing_if="Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub green: Vec<Connection>,
 }
 
@@ -60,14 +69,14 @@ pub struct SignalFilter {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum FilterMode {
-    #[serde(rename="blacklist")]
+    #[serde(rename = "blacklist")]
     Deny,
-    #[serde(rename="whitelist")]
+    #[serde(rename = "whitelist")]
     Allow,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all="lowercase")]
+#[serde(rename_all = "lowercase")]
 pub enum SplitterPriority {
     Left,
     Right,
@@ -76,46 +85,43 @@ pub enum SplitterPriority {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ControlBehavior {
-    #[serde(default, skip_serializing_if="Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub filters: Vec<SignalFilter>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub arithmetic_conditions: Option<serde_json::Value>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub decider_conditions: Option<serde_json::Value>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub circuit_condition: Option<serde_json::Value>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub circuit_parameters: Option<serde_json::Value>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub read_logistics: Option<serde_json::Value>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub read_robot_stats: Option<serde_json::Value>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub read_from_train: Option<serde_json::Value>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub read_stopped_train: Option<serde_json::Value>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub train_stopped_signal: Option<serde_json::Value>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub circuit_mode_of_operation: Option<u8>,
 }
 
 impl ControlBehavior {
     pub fn add_filter(&mut self, signal: Signal) {
-        let last_index = self.filters
-            .last()
-            .map(|f| f.index)
-            .unwrap_or_default();
+        let last_index = self.filters.last().map(|f| f.index).unwrap_or_default();
 
         self.filters.push(SignalFilter {
             signal: SignalID::new(signal.name, signal.ty),
@@ -125,7 +131,8 @@ impl ControlBehavior {
     }
 
     pub fn match_filters<F>(&mut self, signal_id: &SignalID, mut f: F)
-        where F: FnMut(&mut ControlBehavior)
+    where
+        F: FnMut(&mut ControlBehavior),
     {
         let mut matched = false;
 
@@ -142,7 +149,6 @@ impl ControlBehavior {
     }
 }
 
-
 /// See [1]
 ///
 /// [1] https://wiki.factorio.com/Blueprint_string_format#Entity_object
@@ -155,88 +161,89 @@ pub struct Entity {
 
     pub position: Position,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub direction: Option<u32>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub orientation: Option<f32>,
 
     #[serde(default)]
     pub connections: HashMap<String, Cables>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub control_behavior: Option<ControlBehavior>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub items: Option<serde_json::Value>, // TODO
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub recipe: Option<String>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bar: Option<u32>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub inventory: Option<serde_json::Value>, // TODO
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub infinity_settings: Option<serde_json::Value>, // TODO
 
-    #[serde(rename="type", skip_serializing_if="Option::is_none")]
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     pub ty: Option<String>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub input_priority: Option<SplitterPriority>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub output_priority: Option<SplitterPriority>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub filter: Option<String>,
 
     #[serde(default)]
     pub filters: Vec<ItemFilter>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub filter_mode: Option<FilterMode>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub override_stack_size: Option<u8>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub drop_position: Option<Position>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub pickup_position: Option<Position>,
 
-    #[serde(default, skip_serializing_if="Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub request_filters: Vec<RequestFilter>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub request_from_buffers: Option<bool>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub parameters: Option<serde_json::Value>, // TODO
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub alert_parameters: Option<serde_json::Value>, // TODO
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub auto_launch: Option<bool>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub variation: Option<u8>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub color: Option<Color>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub station: Option<String>,
 }
 
 impl Entity {
     pub fn match_request_filters<F>(&mut self, signal_id: &SignalID, mut f: F)
-        where F: FnMut(&mut Vec<RequestFilter>)
+    where
+        F: FnMut(&mut Vec<RequestFilter>),
     {
         if signal_id.ty == SignalType::Item {
             let mut matched = false;
@@ -255,7 +262,6 @@ impl Entity {
     }
 }
 
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Icon {
     index: usize,
@@ -263,34 +269,34 @@ pub struct Icon {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all="kebab-case")]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Blueprint {
     pub item: String, // must be "blueprint"
 
     pub version: u64,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub label_color: Option<Color>,
 
-    #[serde(default, skip_serializing_if="Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub entities: Vec<Entity>,
 
-    #[serde(default, skip_serializing_if="Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tiles: Vec<serde_json::Value>,
 
-    #[serde(default, skip_serializing_if="Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub icons: Vec<Icon>,
 
-    #[serde(default, skip_serializing_if="Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub schedules: Vec<serde_json::Value>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub snap_to_grid: Option<serde_json::Value>,
 
-    #[serde(skip_serializing_if="Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub absolute_snapping: Option<serde_json::Value>,
 }
 
@@ -307,7 +313,7 @@ impl Blueprint {
         let s = s.trim();
 
         if !s.starts_with('0') {
-            return Err(Error::InvalidBlueprintString(s.to_owned()))
+            return Err(Error::InvalidBlueprintString(s.to_owned()));
         }
 
         let compressed_data = base64::decode(&s[1..])?;
@@ -333,21 +339,19 @@ impl Blueprint {
     pub fn bill(&self) -> Vec<Signal> {
         let mut bill = HashMap::new();
 
-        self.entities
-            .iter()
-            .for_each(|entity| {
-                if let Some(count) = bill.get_mut(&entity.name) {
-                    *count += 1;
-                }
-                else {
-                    bill.insert(entity.name.clone(), 1);
-                }
-            });
+        self.entities.iter().for_each(|entity| {
+            if let Some(count) = bill.get_mut(&entity.name) {
+                *count += 1;
+            }
+            else {
+                bill.insert(entity.name.clone(), 1);
+            }
+        });
 
         // TODO: Modules, trains, etc.
 
         bill.into_iter()
-            .map(|(name, count )| Signal::new_item(name, count))
+            .map(|(name, count)| Signal::new_item(name, count))
             .collect()
     }
 }

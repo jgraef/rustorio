@@ -4,7 +4,6 @@ use factorio_remote::{
     FactorioRemote,
 };
 
-
 async fn print_channel_signals(remote: &FactorioRemote, channel: ChannelId) -> Result<(), Error> {
     // Receive signals on channel
     let signals = remote.receive_signals(channel).await?;
@@ -13,15 +12,21 @@ async fn print_channel_signals(remote: &FactorioRemote, channel: ChannelId) -> R
         println!("Received no signals on channel #{}", channel);
     }
     else {
-        println!("Received {} signals on channel #{}:", signals.len(), channel);
+        println!(
+            "Received {} signals on channel #{}:",
+            signals.len(),
+            channel
+        );
         for signal in signals {
-            println!(" - type={:?}, name={}, count={}", signal.ty, signal.name, signal.count);
+            println!(
+                " - type={:?}, name={}, count={}",
+                signal.ty, signal.name, signal.count
+            );
         }
     }
 
     Ok(())
 }
-
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -32,11 +37,11 @@ async fn main() -> Result<(), Error> {
     // Alternatively use `RemoteIO::connect(hostname, password)`.
     let mut remote = FactorioRemote::connect_env().await?;
 
-    // Print signals on channel 1 and 2. Note that we don't get the signals back that we sent, but only the signals
-    // that are send by senders (TODO: entity name?).
+    // Print signals on channel 1 and 2. Note that we don't get the signals back
+    // that we sent, but only the signals that are send by senders (TODO: entity
+    // name?).
     print_channel_signals(&mut remote, 1).await?;
     //print_channel_signals(&mut remote, 2).await?;
-
 
     Ok(())
 }

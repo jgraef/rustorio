@@ -4,7 +4,11 @@ pub mod value;
 
 use serde::Deserialize;
 
-pub use crate::{de::Deserializer, error::Error, value::Value};
+pub use crate::{
+    de::Deserializer,
+    error::Error,
+    value::Value,
+};
 
 pub fn from_slice<'a, T>(input: &'a [u8]) -> Result<T, Error>
 where
@@ -16,7 +20,8 @@ where
     let rest = deserializer.into_slice();
     if rest.is_empty() {
         Ok(x)
-    } else {
+    }
+    else {
         log::error!("Trailing bytes:\n{}", pretty_hex::pretty_hex(&&rest[..32]));
         Err(Error::TrailingBytes)
     }
@@ -24,7 +29,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{from_slice, Value};
+    use super::{
+        from_slice,
+        Value,
+    };
 
     #[test]
     fn it_deserializes_mod_settings() {

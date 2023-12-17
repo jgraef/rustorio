@@ -1,11 +1,16 @@
+use mlua::{
+    Table,
+    Value,
+};
 use palette::LinSrgba;
 
-use crate::{FromLuaTable, Error, to_option};
-use mlua::{Value, Table};
-
+use crate::{
+    to_option,
+    Error,
+    FromLuaTable,
+};
 
 pub type Color = LinSrgba<f32>;
-
 
 impl FromLuaTable for Color {
     fn from_lua_table(table: Table) -> Result<Self, Error> {

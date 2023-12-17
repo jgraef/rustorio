@@ -1,15 +1,15 @@
 [package]
 name = "rustorio-circuits"
 version = "0.1.0"
-authors = ["Janosch Gräf <janosch.graef@gmail.com"]
-edition = "2018"
+authors = ["Janosch Gräf <janosch.graef@gmail.com>"]
+edition = "2021"
 build = "build.rs"
 
 [dependencies]
 log = "0.4"
 dotenv = "0.15"
-pretty_env_logger = "0.4"
-lalrpop-util = "0.19"
+pretty_env_logger = "0.5"
+lalrpop-util = "0.20"
 regex = "1.4"
 derive_more = "0.99"
 thiserror = "1.0"
@@ -21,9 +21,9 @@ serde_json = "1.0"
 num-integer = "0.1"
 num-traits = "0.2"
 morton = "0.3"
-itertools = "0.9"
+itertools = "0.11"
 
 rustorio-core = { path = "../rustorio-core", features = ["blueprint"] }
 
 [build-dependencies]
-lalrpop = { version = "0.19", features = ["lexer"] }
+lalrpop = { version = "0.20", features = ["lexer"] }

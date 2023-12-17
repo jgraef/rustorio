@@ -1,6 +1,12 @@
 use std::collections::HashMap;
 
-use serde::de::{self, Deserialize, Deserializer, MapAccess, Visitor};
+use serde::de::{
+    self,
+    Deserialize,
+    Deserializer,
+    MapAccess,
+    Visitor,
+};
 
 #[derive(Clone, Debug)]
 pub enum Value {

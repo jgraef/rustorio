@@ -1,23 +1,30 @@
 pub mod value;
 
-#[cfg(feature="nalgebra")]
+#[cfg(feature = "nalgebra")]
 pub mod nalgebra;
-#[cfg(feature="palette")]
+#[cfg(feature = "palette")]
 mod palette;
 
+#[doc(hidden)]
+pub mod __private;
 
 use std::{
-    collections::{HashMap, BTreeMap},
-    hash::Hash,
     cmp::Eq,
+    collections::{
+        BTreeMap,
+        HashMap,
+    },
     convert::TryFrom,
-    num::TryFromIntError,
     fmt::Display,
+    hash::Hash,
+    num::TryFromIntError,
 };
 
-pub use mlua::{Value, Table};
+pub use mlua::{
+    Table,
+    Value,
+};
 use thiserror::Error;
-
 
 pub fn to_option<T: FromLuaValue>(value: Value) -> Result<Option<T>, Error> {
     Ok(match value {
@@ -27,14 +34,13 @@ pub fn to_option<T: FromLuaValue>(value: Value) -> Result<Option<T>, Error> {
 }
 
 pub fn to_result<T, E, F>(value: Value, f: F) -> Result<T, Error>
-    where
-        T: FromLuaValue,
-        Error: From<E>,
-        F: FnMut() -> E
+where
+    T: FromLuaValue,
+    Error: From<E>,
+    F: FnMut() -> E,
 {
     Ok(to_option(value)?.ok_or_else(f)?)
 }
-
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -51,8 +57,8 @@ pub enum Error {
     NumConvert(#[from] TryFromIntError),
 
     #[error("Duplicate key in table")]
-    // TODO: Put key into here (maybe we should first move rustorio_core::lua_utils::value to here to have a dynamic
-    // and owned "LuaValue".
+    // TODO: Put key into here (maybe we should first move rustorio_core::lua_utils::value to here
+    // to have a dynamic and owned "LuaValue".
     DuplicateKey,
 
     #[error("Infallible")]
@@ -62,7 +68,7 @@ pub enum Error {
     MissingField(String),
 
     #[error("{0}")]
-    Other(String)
+    Other(String),
 }
 
 impl Error {
@@ -91,7 +97,6 @@ pub trait FromLuaTable: Sized {
     fn from_lua_table(table: Table) -> Result<Self, Error>;
 }
 
-
 macro_rules! impl_with_try_from {
     ($out:ident, $in:ident) => {
         impl FromLuaValue for $out {
@@ -102,7 +107,7 @@ macro_rules! impl_with_try_from {
                 }
             }
         }
-    }
+    };
 }
 
 impl_with_try_from!(i8, Integer);
@@ -145,7 +150,7 @@ impl FromLuaValue for () {
     fn from_lua_value(value: Value) -> Result<Self, Error> {
         match value {
             Value::Nil => Ok(()),
-            x => Err(Error::unexpected(x))
+            x => Err(Error::unexpected(x)),
         }
     }
 }
@@ -154,11 +159,10 @@ impl FromLuaValue for String {
     fn from_lua_value(value: Value) -> Result<Self, Error> {
         match value {
             Value::String(x) => Ok(x.to_str()?.to_owned()),
-            x => Err(Error::unexpected(x))
+            x => Err(Error::unexpected(x)),
         }
     }
 }
-
 
 impl<T: FromLuaTable> FromLuaValue for T {
     fn from_lua_value(value: Value) -> Result<Self, Error> {
@@ -213,7 +217,7 @@ impl<T: FromLuaValue> FromLuaValue for Option<T> {
     fn from_lua_value(value: Value) -> Result<Self, Error> {
         match value {
             Value::Nil => Ok(None),
-            value => Ok(Some(T::from_lua_value(value)?))
+            value => Ok(Some(T::from_lua_value(value)?)),
         }
     }
 }

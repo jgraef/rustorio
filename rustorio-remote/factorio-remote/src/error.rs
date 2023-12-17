@@ -1,6 +1,5 @@
-use thiserror::Error;
 use serde::Deserialize;
-
+use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -21,12 +20,8 @@ pub enum Error {
     #[error("Malformed packet: {0}")]
     MalformedPacket(String),
     #[error("Incorrect pong: expected {expected}, but got {got}")]
-    IncorrectPong {
-        expected: i32,
-        got: i32,
-    },
+    IncorrectPong { expected: i32, got: i32 },
 }
-
 
 #[derive(Clone, Debug, Deserialize, Error)]
 #[error("Remote Error[{}]: {}", {code}, {message})]
@@ -39,8 +34,7 @@ impl Default for LuaError {
     fn default() -> Self {
         Self {
             code: 0,
-            message: "Unknown error".to_owned() ,
+            message: "Unknown error".to_owned(),
         }
     }
 }
-

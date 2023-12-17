@@ -1,9 +1,24 @@
-use darling::{FromDeriveInput, FromMeta, FromField};
-use proc_macro2::{TokenStream, Literal};
-use syn::{parse_str, DataStruct, DataEnum, Fields, Expr, Path, ext::IdentExt};
+use darling::{
+    FromDeriveInput,
+    FromField,
+    FromMeta,
+};
+use heck::ToKebabCase;
+use proc_macro2::{
+    Literal,
+    TokenStream,
+};
 use quote::quote;
-use heck::KebabCase;
-
+use syn::{
+    ext::IdentExt,
+    parse_str,
+    DataEnum,
+    DataStruct,
+    Expr,
+    Fields,
+    Generics,
+    Path,
+};
 
 #[derive(Debug, FromField)]
 #[darling(attributes(lua))]
@@ -24,21 +39,18 @@ pub(crate) struct FieldAttributes {
     with_context: Option<String>,
 }
 
-
 #[derive(Debug, FromMeta)]
-pub(crate) struct ContainerAttributes  {
-
-}
+pub(crate) struct ContainerAttributes {}
 
 #[derive(FromDeriveInput)]
 #[darling(attributes(lua), forward_attrs(allow, doc, cfg))]
 pub(crate) struct DeriveOptions {
     ident: syn::Ident,
     attrs: Vec<syn::Attribute>,
+    generics: Generics,
     #[darling(default)]
     lua: Option<ContainerAttributes>,
 }
-
 
 fn impl_field_init(table_key_lit: Literal, field_attributes: FieldAttributes) -> TokenStream {
     let mut code = vec![];
@@ -56,7 +68,7 @@ fn impl_field_init(table_key_lit: Literal, field_attributes: FieldAttributes) ->
     }
     else {
         code.push(quote! {
-            let x = table.get::<_, ::mlua::Value>(#table_key_lit)?;
+            let x = table.get::<_, ::rustorio_data::__private::mlua::Value>(#table_key_lit)?;
         });
 
         if let Some(with) = field_attributes.with {
@@ -72,7 +84,7 @@ fn impl_field_init(table_key_lit: Literal, field_attributes: FieldAttributes) ->
         }
         else if let Some(default_with) = field_attributes.default_with {
             let expr: Expr = parse_str(&default_with).unwrap();
-                code.push(quote! {
+            code.push(quote! {
                 let x = ::rustorio_data::to_option(x)?.unwrap_or_else(|| #expr);
             });
         }
@@ -91,8 +103,13 @@ fn impl_field_init(table_key_lit: Literal, field_attributes: FieldAttributes) ->
     }
 }
 
-pub(crate) fn impl_from_lua_table_for_struct(data: DataStruct, options: DeriveOptions) -> TokenStream {
+pub(crate) fn impl_from_lua_table_for_struct(
+    data: DataStruct,
+    options: DeriveOptions,
+) -> TokenStream {
     let struct_ident = options.ident;
+
+    let (impl_generics, ty_generics, where_clause) = options.generics.split_for_impl();
 
     let struct_init = match data.fields {
         Fields::Named(fields) => {
@@ -104,7 +121,7 @@ pub(crate) fn impl_from_lua_table_for_struct(data: DataStruct, options: DeriveOp
                 let table_key_lit = Literal::string(&field_ident.unraw().to_string());
 
                 let field_init = impl_field_init(table_key_lit.clone(), field_attributes);
-                field_inits.push(quote! { #field_ident: { log::debug!("Parsing field: {}", #table_key_lit); #field_init }, });
+                field_inits.push(quote! { #field_ident: { log::trace!("Parsing field: {}", #table_key_lit); #field_init }, });
             }
 
             quote! {
@@ -112,7 +129,7 @@ pub(crate) fn impl_from_lua_table_for_struct(data: DataStruct, options: DeriveOp
                     #(#field_inits)*
                 }
             }
-        },
+        }
         Fields::Unnamed(fields) => {
             let mut field_inits = vec![];
 
@@ -121,7 +138,7 @@ pub(crate) fn impl_from_lua_table_for_struct(data: DataStruct, options: DeriveOp
                 let table_key_lit = Literal::usize_unsuffixed(i);
 
                 let field_init = impl_field_init(table_key_lit, field_attributes);
-                field_inits.push(quote!{ #field_init, });
+                field_inits.push(quote! { #field_init, });
             }
 
             quote! {
@@ -129,22 +146,25 @@ pub(crate) fn impl_from_lua_table_for_struct(data: DataStruct, options: DeriveOp
                     #(#field_inits)*
                 )
             }
-        },
+        }
         _ => panic!("Can't derive FromLuaTable for new-type structs."),
     };
 
     quote! {
-        impl ::rustorio_data::FromLuaTable for #struct_ident {
-            fn from_lua_table(table: ::mlua::Table) -> Result<Self, ::rustorio_data::Error> {
+        impl #impl_generics ::rustorio_data::FromLuaTable for #struct_ident #ty_generics #where_clause {
+            fn from_lua_table(table: ::rustorio_data::__private::mlua::Table) -> Result<Self, ::rustorio_data::Error> {
                 Ok(#struct_init)
             }
         }
     }
 }
 
-
-pub(crate) fn impl_from_lua_value_for_newtype_struct(data: DataStruct, options: DeriveOptions) -> TokenStream {
+pub(crate) fn impl_from_lua_value_for_newtype_struct(
+    data: DataStruct,
+    options: DeriveOptions,
+) -> TokenStream {
     let struct_ident = options.ident;
+    let (impl_generics, ty_generics, where_clause) = options.generics.split_for_impl();
 
     match data.fields {
         Fields::Unnamed(fields) => {
@@ -153,7 +173,7 @@ pub(crate) fn impl_from_lua_value_for_newtype_struct(data: DataStruct, options: 
             }
 
             quote! {
-                impl ::rustorio_data::FromLuaValue for #struct_ident {
+                impl #impl_generics ::rustorio_data::FromLuaValue for #struct_ident #ty_generics #where_clause {
                     fn from_lua_value(value: ::rustorio_data::Value) -> Result<Self, ::rustorio_data::Error> {
                         Ok(Self(::rustorio_data::FromLuaValue::from_lua_value(value)?))
                     }
@@ -164,10 +184,10 @@ pub(crate) fn impl_from_lua_value_for_newtype_struct(data: DataStruct, options: 
     }
 }
 
-
 pub(crate) fn impl_from_lua_value_for_enum(data: DataEnum, options: DeriveOptions) -> TokenStream {
     let enum_ident = options.ident;
     let mut match_arms = vec![];
+    let (impl_generics, ty_generics, where_clause) = options.generics.split_for_impl();
 
     for variant in data.variants {
         if variant.fields != Fields::Unit {
@@ -183,7 +203,7 @@ pub(crate) fn impl_from_lua_value_for_enum(data: DataEnum, options: DeriveOption
     }
 
     quote! {
-        impl ::rustorio_data::FromLuaValue for #enum_ident {
+        impl #impl_generics ::rustorio_data::FromLuaValue for #enum_ident #ty_generics #where_clause {
             fn from_lua_value(value: ::rustorio_data::Value) -> Result<Self, ::rustorio_data::Error> {
                 let s = String::from_lua_value(value)?;
                 match s.as_str() {

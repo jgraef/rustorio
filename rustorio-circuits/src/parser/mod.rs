@@ -54,7 +54,7 @@ impl ParseError {
             InnerError::InvalidToken { location } => {
                 Span { start: *location, end: *location }
             },
-            InnerError::UnrecognizedEOF { location, .. } => {
+            InnerError::UnrecognizedEof { location, .. } => {
                 Span { start: *location, end: *location }
             },
             InnerError::UnrecognizedToken { token: (start, _, end), .. } => {

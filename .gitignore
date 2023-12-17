@@ -1,1 +1,5 @@
 /target
+/data
+/.env
+/.vscode
+/Cargo.lock

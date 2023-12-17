@@ -1,8 +1,15 @@
 use std::convert::TryFrom;
 
-use byteorder::{ByteOrder, LittleEndian};
+use byteorder::{
+    ByteOrder,
+    LittleEndian,
+};
 use serde::{
-    de::{self, DeserializeSeed, Visitor},
+    de::{
+        self,
+        DeserializeSeed,
+        Visitor,
+    },
     forward_to_deserialize_any,
 };
 
@@ -87,7 +94,8 @@ impl<'de> Deserializer<'de> {
         if self.read_bool()? {
             log::trace!("empty string");
             Ok("")
-        } else {
+        }
+        else {
             let n = self.read_varint()? as usize;
             log::trace!("reading string with length {}", n);
             let data = self.read_bytes(n)?;
@@ -99,7 +107,8 @@ impl<'de> Deserializer<'de> {
         let b = self.read_bytes(1)?[0];
         if b == 0xff {
             Ok(LittleEndian::read_u32(self.read_bytes(4)?))
-        } else {
+        }
+        else {
             Ok(b as u32)
         }
     }
@@ -133,7 +142,10 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             PropertyType::List | PropertyType::Dictionary => {
                 let n = self.read_u32()?;
                 log::trace!("Reading map with {} entries...", n);
-                visitor.visit_map(&mut MapAccess { n: n as usize, de: self })
+                visitor.visit_map(&mut MapAccess {
+                    n: n as usize,
+                    de: self,
+                })
             }
         }
     }
@@ -179,8 +191,11 @@ impl<'de, 'a> de::MapAccess<'de> for MapAccess<'de, 'a> {
         K: DeserializeSeed<'de>,
     {
         if self.n > 0 {
-            Ok(Some(seed.deserialize(KeyDeserializer { inner: &mut *self.de })?))
-        } else {
+            Ok(Some(seed.deserialize(KeyDeserializer {
+                inner: &mut *self.de,
+            })?))
+        }
+        else {
             Ok(None)
         }
     }

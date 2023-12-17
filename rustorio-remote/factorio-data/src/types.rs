@@ -1,16 +1,24 @@
 use std::{
-    str::FromStr,
     cmp::Ordering,
+    str::FromStr,
 };
 
-use serde::{Serialize, Deserialize};
 #[cfg(feature = "nalgebra")]
-use nalgebra::{Point2, Vector2};
-use parse_display::{Display, FromStr};
+use nalgebra::{
+    Point2,
+    Vector2,
+};
+use parse_display::{
+    Display,
+    FromStr,
+};
 use regex::Regex;
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 use crate::error::Error;
-
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Color {
@@ -25,7 +33,7 @@ pub struct Color {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Display, FromStr)]
-#[serde(rename_all="lowercase")]
+#[serde(rename_all = "lowercase")]
 pub enum SignalType {
     Item,
     Fluid,
@@ -63,7 +71,8 @@ pub struct SignalID {
 
 impl Ord for SignalID {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.ty.cmp(&other.ty)
+        self.ty
+            .cmp(&other.ty)
             .then_with(|| self.name.cmp(&other.name))
     }
 }
@@ -76,10 +85,7 @@ impl PartialOrd for SignalID {
 
 impl SignalID {
     pub fn new(name: String, ty: SignalType) -> Self {
-        Self {
-            name,
-            ty,
-        }
+        Self { name, ty }
     }
 
     pub fn new_item(name: String) -> Self {
@@ -139,11 +145,7 @@ impl FromStr for Signal {
 
 impl Signal {
     pub fn new(name: String, ty: SignalType, count: i32) -> Self {
-        Self {
-            name,
-            ty,
-            count
-        }
+        Self { name, ty, count }
     }
 
     pub fn new_item(name: String, count: i32) -> Self {
@@ -161,7 +163,7 @@ impl Signal {
     pub fn into_signal(self) -> SignalID {
         SignalID {
             name: self.name,
-            ty: self.ty
+            ty: self.ty,
         }
     }
 }
@@ -170,11 +172,10 @@ pub type ChannelId = i32;
 
 pub type UnitNumber = u32;
 
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TrainSchedule {
     pub current: u32,
-    pub records: Vec<TrainScheduleRecord>
+    pub records: Vec<TrainScheduleRecord>,
 }
 
 impl Default for TrainSchedule {
@@ -231,7 +232,7 @@ impl WaitCondition {
     pub fn single(ty: WaitConditionType) -> Vec<Self> {
         vec![Self {
             ty,
-            compare_type: CompareType::Or
+            compare_type: CompareType::Or,
         }]
     }
 }
@@ -240,7 +241,7 @@ impl WaitCondition {
 #[serde(rename_all = "lowercase")]
 pub enum CompareType {
     And,
-    Or
+    Or,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -283,7 +284,7 @@ impl From<Point2<f32>> for Position {
     fn from(point: Point2<f32>) -> Self {
         Self {
             x: point.x,
-            y: point.y
+            y: point.y,
         }
     }
 }
@@ -291,10 +292,7 @@ impl From<Point2<f32>> for Position {
 #[cfg(feature = "nalgebra")]
 impl From<Position> for Point2<f32> {
     fn from(position: Position) -> Self {
-        Point2::new(
-            position.x,
-            position.y
-        )
+        Point2::new(position.x, position.y)
     }
 }
 
@@ -303,7 +301,7 @@ impl From<Vector2<f32>> for Position {
     fn from(vector: Vector2<f32>) -> Self {
         Self {
             x: vector.x,
-            y: vector.y
+            y: vector.y,
         }
     }
 }
@@ -311,13 +309,9 @@ impl From<Vector2<f32>> for Position {
 #[cfg(feature = "nalgebra")]
 impl From<Position> for Vector2<f32> {
     fn from(position: Position) -> Self {
-        Vector2::new(
-            position.x,
-            position.y
-        )
+        Vector2::new(position.x, position.y)
     }
 }
-
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Entity {

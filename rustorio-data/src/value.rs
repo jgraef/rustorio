@@ -1,16 +1,38 @@
 use std::{
-    collections::btree_map::{BTreeMap, Iter},
-    fmt::{self, Debug, Formatter},
+    collections::btree_map::{
+        BTreeMap,
+        Iter,
+    },
+    fmt::{
+        self,
+        Debug,
+        Formatter,
+    },
+    hash::{
+        Hash,
+        Hasher,
+    },
     iter::FromIterator,
-    hash::{Hash, Hasher},
 };
 
-use derive_more::{From, Into, AsRef, AsMut, IntoIterator};
-#[cfg(feature="serde")]
-use serde::{Deserialize, Serialize};
+use derive_more::{
+    AsMut,
+    AsRef,
+    From,
+    Into,
+    IntoIterator,
+};
+#[cfg(feature = "serde")]
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
-use super::{FromLuaValue, FromLuaTable, Error};
-
+use super::{
+    Error,
+    FromLuaTable,
+    FromLuaValue,
+};
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Type {
@@ -32,7 +54,7 @@ impl Type {
 }
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
-#[cfg_attr(feature="serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Key {
     Nil,
     Boolean(bool),
@@ -155,7 +177,7 @@ impl Debug for Key {
 }
 
 #[derive(Clone, Default, AsRef, AsMut, Into, From, IntoIterator)]
-#[cfg_attr(feature="serde", derive(Serialize, Deserialize), serde(transparent))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(transparent))]
 pub struct Table(BTreeMap<Key, Value>);
 
 impl Table {
@@ -213,7 +235,7 @@ impl Debug for Table {
 }
 
 #[derive(Clone)]
-#[cfg_attr(feature="serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Value {
     Nil,
     Boolean(bool),

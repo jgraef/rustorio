@@ -5,14 +5,22 @@
 //! # TODO
 //!
 //!  - Write tests for serialization
-//!
 
+use mlua::{
+    Table,
+    Value,
+};
 use nalgebra::Point2;
-use mlua::{Value, Table};
-use serde::{Serialize, Deserialize};
-
-use rustorio_data::{FromLuaTable, Error, to_result, to_option};
-
+use rustorio_data::{
+    to_option,
+    to_result,
+    Error,
+    FromLuaTable,
+};
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BoundingBox {
@@ -31,7 +39,7 @@ impl FromLuaTable for BoundingBox {
         Ok(BoundingBox {
             top_left,
             bottom_right,
-            orientation
+            orientation,
         })
     }
 }

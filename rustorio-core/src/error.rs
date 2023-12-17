@@ -1,7 +1,10 @@
 use thiserror::Error;
 
 use crate::{
-    mod_loader::{DependencyError, DependencyParseError},
+    mod_loader::{
+        DependencyError,
+        DependencyParseError,
+    },
     version::VersionParseError,
 };
 
