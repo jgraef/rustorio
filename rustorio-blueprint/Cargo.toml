@@ -1,0 +1,17 @@
+[package]
+name = "rustorio-blueprint"
+version = "0.1.0"
+authors = ["Janosch Gräf <janosch.graef@gmail.com>"]
+edition = "2021"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+base64 = "0.21"
+libflate = "2.0"
+parse-display = "0.8"
+regex = "1.10"
+lazy_static = "1.4"
+thiserror = "1.0"
+nalgebra = "0.32"
+palette = "0.7"

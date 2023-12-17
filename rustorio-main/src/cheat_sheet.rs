@@ -1,16 +1,14 @@
 use std::io::Write;
 
 use color_eyre::eyre::Error;
-use rustorio_core::{
-    prototypes::{
-        technology::{
-            Modifier,
-            TechnologyPrototype,
-        },
-        HasPrototypes,
-        Id,
+use rustorio_prototype::{
+    material::MaterialId,
+    technology::{
+        Modifier,
+        TechnologyPrototype,
     },
-    types::MaterialId,
+    HasPrototypes,
+    Id,
 };
 
 use crate::{

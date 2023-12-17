@@ -13,21 +13,19 @@ use std::{
     },
 };
 
-use rustorio_core::{
-    prototypes::{
-        fluid::FluidPrototype,
-        item::ItemPrototype,
-        recipe::{
-            IngredientPrototype,
-            ProductPrototype,
-        },
-        Id,
+use rustorio_prototype::{
+    fluid::FluidPrototype,
+    item::ItemPrototype,
+    material::MaterialId,
+    recipe::{
+        IngredientPrototype,
+        ProductPrototype,
     },
     types::{
         ItemOrFluid,
-        MaterialId,
         MaterialType,
     },
+    Id,
 };
 use serde::{
     Deserialize,

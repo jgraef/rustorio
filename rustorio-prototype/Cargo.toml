@@ -1,0 +1,29 @@
+[package]
+name = "rustorio-prototype"
+version = "0.1.0"
+authors = ["Janosch Gräf <janosch.graef@gmail.com>"]
+edition = "2021"
+
+[dependencies]
+log = "0.4"
+thiserror = "1.0"
+serde = { version = "1.0", features = ["derive"], optional = true }
+bigdecimal = "0.4"
+num-bigint = "0.4"
+regex = "1.10"
+lazy_static = "1.4"
+num = "0.4"
+derive_more = "0.99"
+nalgebra = "0.32"
+palette = "0.7"
+
+[dependencies.rustorio-lua-api]
+version = "0.1.0"
+path = "../rustorio-lua-api"
+features = ["derive", "palette", "nalgebra"]
+optional = true
+
+[features]
+default = []
+serde = ["dep:serde", "rustorio-lua-api/serde", "bigdecimal/serde"]
+lua-api = ["dep:rustorio-lua-api"]

@@ -2,12 +2,12 @@
 resolver = "2"
 members = [
     #"rustorio-circuits",
-    "rustorio-core",
-    "rustorio-data",
-    "rustorio-data-derive",
+    "rustorio-blueprint",
+    "rustorio-lua-api",
+    "rustorio-lua-api-derive",
     "rustorio-main",
     "rustorio-proptree",
-    "rustorio-protoview",
+    "rustorio-prototype",
     "rustorio-remote/factorio-remote",
     "rustorio-remote/factorio-data",
 ]

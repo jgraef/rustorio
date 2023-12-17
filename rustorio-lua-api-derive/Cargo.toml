@@ -1,0 +1,15 @@
+[package]
+name = "rustorio-lua-api-derive"
+version = "0.1.0"
+authors = ["Janosch Gräf <janosch.graef@gmail.com>"]
+edition = "2021"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+darling = "0.20"
+syn = { version = "2.0", features = ["full"] }
+quote = "1.0"
+proc-macro2 = "1.0"
+heck = "0.4"

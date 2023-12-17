@@ -20,15 +20,13 @@ use std::{
 };
 
 use color_eyre::eyre::Error;
-use rustorio_core::{
-    mod_loader::ModLoader,
-    prototypes::{
-        item::ItemPrototype,
-        technology::TechnologyPrototype,
-        HasPrototypes,
-        InheritsBase,
-        Prototypes,
-    },
+use rustorio_lua_api::loader::ModLoader;
+use rustorio_prototype::{
+    item::ItemPrototype,
+    technology::TechnologyPrototype,
+    HasPrototypes,
+    InheritsBase,
+    Prototypes,
 };
 use structopt::StructOpt;
 

@@ -1,4 +1,4 @@
-use rustorio_core::prototypes::{
+use rustorio_prototype::{
     item::ModulePrototype,
     technology::TechnologyPrototype,
     HasPrototypes,

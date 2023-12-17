@@ -19,6 +19,9 @@ regex = "1.9"
 lazy_static = "1.4"
 num-traits = "0.2"
 
-rustorio-core = { path = "../rustorio-core", features = ["prototypes"] }
-rustorio-data = { path = "../rustorio-data" }
-rustorio-data-derive = { path = "../rustorio-data-derive" }
+[dependencies.rustorio-prototype]
+path = "../rustorio-prototype"
+features = ["lua-api", "serde"]
+
+[dependencies.rustorio-lua-api]
+path = "../rustorio-lua-api"

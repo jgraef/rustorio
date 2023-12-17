@@ -238,7 +238,7 @@ where
     R: serde::ser::Serialize,
 {
     request_type: &'t str,
-    #[serde(flatten)]
+    #[cfg_attr(feature = "serde", serde(flatten))]
     body: &'r R,
 }
 
@@ -275,7 +275,7 @@ where
 #[derive(Clone, Debug, Serialize)]
 pub struct PrintRequest<'m> {
     pub message: &'m str,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub color: Option<Color>,
 }
 

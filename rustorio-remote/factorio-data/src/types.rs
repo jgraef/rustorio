@@ -223,7 +223,7 @@ impl TrainScheduleRecord {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct WaitCondition {
-    #[serde(flatten)]
+    #[cfg_attr(feature = "serde", serde(flatten))]
     pub ty: WaitConditionType,
     pub compare_type: CompareType,
 }
