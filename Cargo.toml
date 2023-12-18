@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     #"rustorio-circuits",
     "rustorio-blueprint",
+    "rustorio-export",
     "rustorio-lua-api",
     "rustorio-lua-api-derive",
     "rustorio-main",

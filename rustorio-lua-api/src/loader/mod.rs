@@ -371,8 +371,6 @@ impl DependencyChecker {
 
 #[derive(Debug)]
 pub struct Mod {
-    path: PathBuf,
-
     info: InfoJson,
 
     version: Version,
@@ -412,7 +410,6 @@ impl Mod {
         }
 
         Ok(Mod {
-            path: path.to_owned(),
             info,
             version,
             factorio_version,
@@ -526,6 +523,13 @@ impl Builder {
         }
     }
 
+    pub fn from_data_dir(data_dir: impl AsRef<Path>) -> Result<Self, Error> {
+        let data_dir = data_dir.as_ref();
+        let mut builder = Self::new(data_dir.join("core"));
+        builder.add_mod(data_dir.join("base"))?;
+        Ok(builder)
+    }
+
     pub fn add_mod(&mut self, path: impl AsRef<Path>) -> Result<(), Error> {
         let fmod = Mod::open(path)?;
         self.mods.insert(fmod);
@@ -576,9 +580,12 @@ impl Loader {
     }
 
     pub fn vanilla(data_dir: impl AsRef<Path>) -> Result<Self, Error> {
-        let data_dir = data_dir.as_ref();
-        let mut builder = Builder::new(data_dir.join("core"));
-        builder.add_mod(data_dir.join("base"))?;
+        Ok(Builder::from_data_dir(data_dir)?.finish()?)
+    }
+
+    pub fn modded(data_dir: impl AsRef<Path>, mod_dir: impl AsRef<Path>) -> Result<Self, Error> {
+        let mut builder = Builder::from_data_dir(data_dir)?;
+        builder.add_mod_dir(mod_dir)?;
         Ok(builder.finish()?)
     }
 
@@ -639,5 +646,9 @@ impl Loader {
         let data_raw = lua::get_data_raw(&lua)?;
 
         Ok(T::from_lua_value(data_raw)?)
+    }
+
+    pub fn read_file(&self, path: impl AsRef<Path>) -> Result<Vec<u8>, Error> {
+        self.scopes.unscoped().read(path)
     }
 }

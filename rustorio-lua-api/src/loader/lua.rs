@@ -192,17 +192,24 @@ impl Scopes {
         }
     }
 
+    pub fn unscoped(&self) -> Scope {
+        Scope {
+            scopes: self.clone(),
+            local: None,
+        }
+    }
+
     pub fn core_scope(&self) -> Scope {
         Scope {
             scopes: self.clone(),
-            local: Local::Core,
+            local: Some(Local::Core),
         }
     }
 
     pub fn mod_scope(&self, fmod: Arc<Mod>) -> Scope {
         Scope {
             scopes: self.clone(),
-            local: Local::Mod(fmod),
+            local: Some(Local::Mod(fmod)),
         }
     }
 }
@@ -216,7 +223,7 @@ enum Local {
 #[derive(Debug, Clone)]
 pub struct Scope {
     scopes: Scopes,
-    local: Local,
+    local: Option<Local>,
 }
 
 impl Scope {
@@ -229,7 +236,7 @@ impl Scope {
                     .get(fmod)
                     .map(|fmod| Local::Mod(fmod.clone()))
             }
-            None => Some(self.local.clone()),
+            None => self.local.clone(),
         }
     }
 
@@ -296,11 +303,12 @@ impl Scope {
         Err(Error::FileNotFound(path))
     }
 
-    fn scope_id(&self) -> ScopeId {
-        match &self.local {
+    fn scope_id(&self) -> Option<ScopeId> {
+        let scope_id = match self.local.as_ref()? {
             Local::Core => ScopeId::Core,
             Local::Mod(fmod) => ScopeId::Mod(fmod.name()),
-        }
+        };
+        Some(scope_id)
     }
 }
 

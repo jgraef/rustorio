@@ -74,14 +74,19 @@ impl Write for OutputFile {
 }
 
 #[derive(Debug, StructOpt)]
-enum Args {
-    Export {
-        #[structopt(short, long)]
-        output: Option<PathBuf>,
+pub struct Args {
+    #[structopt(long, env = "FACTORIO_DATA")]
+    data_dir: PathBuf,
 
-        #[structopt(short, long)]
-        pretty: bool,
-    },
+    #[structopt(long, env = "FACTORIO_MODS")]
+    mod_dir: Option<PathBuf>,
+
+    #[structopt(subcommand)]
+    command: Command,
+}
+
+#[derive(Debug, StructOpt)]
+enum Command {
     CheatSheet {
         #[structopt(short, long)]
         output: Option<PathBuf>,
@@ -94,21 +99,16 @@ enum Args {
 
 impl Args {
     fn run(self) -> Result<(), Error> {
-        let loader = Loader::vanilla("data")?;
+        let loader = if let Some(mod_dir) = &self.mod_dir {
+            Loader::modded(&self.data_dir, mod_dir)?
+        }
+        else {
+            Loader::vanilla(&self.data_dir)?
+        };
         let prototypes: Prototypes = loader.data_stage()?;
 
-        match self {
-            Self::Export { output, pretty } => {
-                let output_file = OutputFile::open(output)?;
-
-                if pretty {
-                    serde_json::to_writer_pretty(output_file, &prototypes)?;
-                }
-                else {
-                    serde_json::to_writer(output_file, &prototypes)?;
-                }
-            }
-            Self::CheatSheet { output: _, config } => {
+        match self.command {
+            Command::CheatSheet { output: _, config } => {
                 let config: Config = toml::from_str(&std::fs::read_to_string(&config)?)?;
 
                 let cheat_sheet = CheatSheet::generate(&config, &prototypes)?;
@@ -117,7 +117,7 @@ impl Args {
                 //let output_file = OutputFile::open(output)?;
                 //cheat_sheet.write(output_file)?;
             }
-            Self::ListTechnologies => {
+            Command::ListTechnologies => {
                 let mut technologies =
                     HasPrototypes::<TechnologyPrototype>::iter(&prototypes).collect::<Vec<_>>();
                 technologies.sort_by_cached_key(|t| &t.base().order);
@@ -125,7 +125,7 @@ impl Args {
                     println!("{}", technology.base().name);
                 }
             }
-            Self::ListItems => {
+            Command::ListItems => {
                 let mut items =
                     HasPrototypes::<ItemPrototype>::iter(&prototypes).collect::<Vec<_>>();
                 items.sort_by_cached_key(|t| &t.base().name);

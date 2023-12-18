@@ -7,6 +7,7 @@ use std::{
         Display,
         Formatter,
     },
+    path::Path,
     str::FromStr,
 };
 
@@ -1575,6 +1576,18 @@ pub enum EquipmentShapeType {
 #[cfg_attr(feature = "lua-api", derive(FromLuaValue))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(transparent))]
 pub struct FileName(String);
+
+impl FileName {
+    pub fn as_path(&self) -> &Path {
+        Path::new(&self.0)
+    }
+}
+
+impl AsRef<Path> for FileName {
+    fn as_ref(&self) -> &Path {
+        self.as_path()
+    }
+}
 
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "lua-api", derive(FromLuaTable))]
