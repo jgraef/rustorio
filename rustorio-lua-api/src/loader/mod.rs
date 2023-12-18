@@ -1,4 +1,4 @@
-mod lua_utils;
+mod lua;
 
 use std::{
     cmp::Ordering,
@@ -28,12 +28,17 @@ use byteorder::{
     ReadBytesExt,
 };
 use lazy_static::lazy_static;
-use mlua::Lua;
 use regex::Regex;
 use rustorio_proptree::Value as PropertyTree;
 use serde::Deserialize;
 use thiserror::Error;
 
+use self::lua::{
+    FactorioLua,
+    ModFiles,
+    PathError,
+    Scopes,
+};
 use crate::FromLuaValue;
 
 #[derive(Debug, thiserror::Error)]
@@ -64,6 +69,15 @@ pub enum Error {
 
     #[error("Error while converting Lua value: {0}")]
     LuaApi(#[from] crate::Error),
+
+    #[error("zip error")]
+    Zip(#[from] zip::result::ZipError),
+
+    #[error("invalid path")]
+    Path(#[from] PathError),
+
+    #[error("file not found: {0}")]
+    FileNotFound(PathBuf),
 }
 
 lazy_static! {
@@ -242,7 +256,7 @@ impl Dependency {
         }
     }
 
-    pub fn check(&self, fmod: Option<&Arc<Mod>>) -> Result<(), DependencyError> {
+    pub fn check(&self, fmod: Option<&Mod>) -> Result<(), DependencyError> {
         match (self.prefix, fmod) {
             (DependencyPrefix::Hard, None) => {
                 return Err(DependencyError::Missing(self.clone()));
@@ -250,7 +264,7 @@ impl Dependency {
             (DependencyPrefix::Hard, Some(fmod)) => {
                 if !self.version_matches(&fmod.version) {
                     return Err(DependencyError::Incompatible(
-                        Arc::clone(fmod),
+                        fmod.name().to_owned(),
                         self.clone(),
                     ));
                 }
@@ -258,7 +272,7 @@ impl Dependency {
             (DependencyPrefix::Incompatible, Some(fmod)) => {
                 if self.version_matches(&fmod.version) {
                     return Err(DependencyError::Incompatible(
-                        Arc::clone(fmod),
+                        fmod.name().to_owned(),
                         self.clone(),
                     ));
                 }
@@ -273,13 +287,13 @@ impl Dependency {
 #[derive(Debug, Error)]
 pub enum DependencyError {
     #[error("Dependency cycle detected")]
-    Cycle(Vec<(Arc<Mod>, Dependency)>),
+    Cycle(Vec<(String, Dependency)>),
 
     #[error("Missing dependency: {0:?}")]
     Missing(Dependency),
 
     #[error("Dependency {1:?} incompatible with mod: {0:?}")]
-    Incompatible(Arc<Mod>, Dependency),
+    Incompatible(String, Dependency),
 
     #[error("Two conflicting dependencies: {0:?} and {1:?}")]
     Conflict(Dependency, Dependency),
@@ -288,13 +302,8 @@ pub enum DependencyError {
 struct DependencyChecker;
 
 impl DependencyChecker {
-    pub fn sort_mods(mods: &HashMap<String, Arc<Mod>>) -> Vec<Arc<Mod>> {
-        let mut mods = mods
-            .values()
-            .map(|fmod| Arc::clone(fmod))
-            .collect::<Vec<Arc<Mod>>>();
-
-        mods.sort_by(|a, b| {
+    pub fn sort_mods(mods: &mut Mods) {
+        mods.mods.sort_by(|a, b| {
             if a.depends_on(b).is_some() {
                 Ordering::Greater
             }
@@ -305,15 +314,13 @@ impl DependencyChecker {
                 Ordering::Equal
             }
         });
-
-        mods
     }
 
-    pub fn check(mods: &HashMap<String, Arc<Mod>>) -> Result<(), DependencyError> {
+    pub fn check(mods: &Mods) -> Result<(), DependencyError> {
         let mut checked = HashSet::new();
         let mut chain = vec![];
 
-        for fmod in mods.values() {
+        for fmod in mods.iter() {
             if !checked.contains(fmod.name()) {
                 Self::check_mod(fmod.name(), mods, &mut chain, &mut checked)?;
             }
@@ -324,7 +331,7 @@ impl DependencyChecker {
 
     fn check_mod<'a>(
         mod_name: &'a str,
-        mods: &'a HashMap<String, Arc<Mod>>,
+        mods: &'a Mods,
         chain: &mut Vec<(&'a str, &'a Dependency)>,
         checked: &mut HashSet<&'a str>,
     ) -> Result<(), DependencyError> {
@@ -334,18 +341,13 @@ impl DependencyChecker {
         {
             let cycle = chain[i..]
                 .iter()
-                .map(|(mod_name, dep)| {
-                    (
-                        Arc::clone(mods.get(*mod_name).as_ref().unwrap()),
-                        (*dep).clone(),
-                    )
-                })
+                .map(|(mod_name, dep)| ((*mod_name).to_owned(), (*dep).clone()))
                 .collect();
             return Err(DependencyError::Cycle(cycle));
         }
 
         for dep in mods.get(mod_name).as_ref().unwrap().dependencies.values() {
-            let dep_mod = mods.get(&dep.mod_name);
+            let dep_mod = mods.get(&dep.mod_name).map(|m| m.as_ref());
 
             dep.check(dep_mod)?;
 
@@ -367,7 +369,7 @@ impl DependencyChecker {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Mod {
     path: PathBuf,
 
@@ -378,21 +380,19 @@ pub struct Mod {
     factorio_version: Version,
 
     dependencies: HashMap<String, Dependency>,
+
+    files: ModFiles,
 }
 
 impl Mod {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
         log::info!("Loading mod: {}", path.as_ref().display());
 
-        let info_path = path.as_ref().join("info.json");
-        let reader = BufReader::new(File::open(info_path)?);
-
-        let info: InfoJson = serde_json::from_reader(reader)?;
+        let path = path.as_ref();
+        let files = ModFiles::open(path)?;
+        let info: InfoJson = serde_json::from_slice(&files.read("info.json")?)?;
 
         let version = info.version.parse()?;
-
-        // TODO: check if path matches mod name and version
-
         let factorio_version = info
             .factorio_version
             .as_ref()
@@ -412,11 +412,12 @@ impl Mod {
         }
 
         Ok(Mod {
-            path: path.as_ref().to_owned(),
+            path: path.to_owned(),
             info,
             version,
             factorio_version,
             dependencies,
+            files,
         })
     }
 
@@ -426,27 +427,6 @@ impl Mod {
 
     pub fn factorio_version(&self) -> Version {
         self.factorio_version
-    }
-
-    pub fn run_lua<P: AsRef<Path>>(&self, lua: &mut Lua, file_name: P) -> Result<(), Error> {
-        let source_path = self.path.join(file_name.as_ref());
-
-        if !source_path.exists() {
-            log::info!("Skipping {}", source_path.display());
-            return Ok(());
-        }
-
-        log::debug!(
-            "Running {} on {}: {}",
-            file_name.as_ref().display(),
-            self.name(),
-            source_path.display()
-        );
-
-        lua_utils::set_mod_path(lua, &self.path)?;
-        lua_utils::run_file(lua, source_path)?;
-
-        Ok(())
     }
 
     pub fn name(&self) -> &str {
@@ -508,101 +488,119 @@ impl ModSettings {
     }
 }
 
-pub struct ModLoader {
-    core_path: PathBuf,
-    settings: Option<ModSettings>,
-    mods: HashMap<String, Arc<Mod>>,
-    mods_sorted: Vec<Arc<Mod>>,
+#[derive(Debug, Default)]
+struct Mods {
+    mods: Vec<Arc<Mod>>,
+    by_name: HashMap<String, Arc<Mod>>,
 }
 
-impl ModLoader {
-    pub fn new<P>(core_path: P) -> Result<Self, Error>
-    where
-        P: AsRef<Path>,
-    {
-        Ok(Self {
-            core_path: core_path.as_ref().to_owned(),
+impl Mods {
+    pub fn insert(&mut self, fmod: Mod) {
+        let fmod = Arc::new(fmod);
+        let name = fmod.name().to_owned();
+        self.mods.push(fmod.clone());
+        self.by_name.insert(name, fmod);
+    }
+
+    pub fn iter<'a>(&'a self) -> impl Iterator<Item = &Arc<Mod>> + 'a {
+        self.mods.iter()
+    }
+
+    pub fn get(&self, name: &str) -> Option<&Arc<Mod>> {
+        self.by_name.get(name)
+    }
+}
+
+pub struct Builder {
+    core_path: PathBuf,
+    mods: Mods,
+    settings: Option<ModSettings>,
+}
+
+impl Builder {
+    pub fn new(core: impl AsRef<Path>) -> Self {
+        Self {
+            core_path: core.as_ref().to_owned(),
+            mods: Mods::default(),
             settings: None,
-            mods: HashMap::new(),
-            mods_sorted: vec![],
-        })
+        }
     }
 
-    pub fn new_with_base<P, Q>(core_path: P, base_path: Q) -> Result<Self, Error>
-    where
-        P: AsRef<Path>,
-        Q: AsRef<Path>,
-    {
-        let mut loader = Self::new(core_path)?;
-        loader.add_base_mod(base_path)?;
-        Ok(loader)
-    }
-
-    pub fn new_full<P, Q, R>(core_path: P, base_path: Q, mod_dir: R) -> Result<Self, Error>
-    where
-        P: AsRef<Path>,
-        Q: AsRef<Path>,
-        R: AsRef<Path>,
-    {
-        let mut loader = Self::new_with_base(core_path, base_path)?;
-        loader.add_mod_dir(mod_dir)?;
-        Ok(loader)
-    }
-
-    pub fn add_base_mod<P: AsRef<Path>>(&mut self, path: P) -> Result<Arc<Mod>, Error> {
-        let base = Arc::new(Mod::open(path)?);
-        let r = self.mods.insert("base".to_owned(), Arc::clone(&base));
-        assert!(r.is_none());
-        Ok(base)
+    pub fn add_mod(&mut self, path: impl AsRef<Path>) -> Result<(), Error> {
+        let fmod = Mod::open(path)?;
+        self.mods.insert(fmod);
+        Ok(())
     }
 
     pub fn add_mod_dir<P: AsRef<Path>>(&mut self, mod_dir: P) -> Result<(), Error> {
-        // TODO: Store mod_settings path so we can store settings later.
         self.settings = Some(ModSettings::read_from_file(
             mod_dir.as_ref().join("mod-settings.dat"),
         )?);
 
-        log::debug!("Scanning mod dir: {}", mod_dir.as_ref().display());
-
         for r in mod_dir.as_ref().read_dir()? {
             let entry = r?;
-            if entry.file_type()?.is_dir() && entry.path().join("info.json").exists() {
-                let fmod = Arc::new(Mod::open(entry.path())?);
-
-                if let Some(other_mod) = self.mods.insert(fmod.name().to_owned(), Arc::clone(&fmod))
-                {
-                    return Err(Error::DuplicateMod(
-                        other_mod.name().to_owned(),
-                        fmod.name().to_owned(),
-                    ));
-                }
+            if entry.file_type()?.is_dir() && entry.path().join("info.json").exists()
+                || entry.path().extension().and_then(|e| e.to_str()) == Some("zip")
+            {
+                self.add_mod(entry.path())?;
             }
         }
 
         Ok(())
     }
 
-    pub fn check_dependencies(&mut self) -> Result<(), Error> {
+    pub fn finish(mut self) -> Result<Loader, Error> {
         DependencyChecker::check(&self.mods)?;
-        self.mods_sorted = DependencyChecker::sort_mods(&self.mods);
-        Ok(())
+        DependencyChecker::sort_mods(&mut self.mods);
+
+        let mods = Arc::new(self.mods);
+        let scopes = Scopes::new(self.core_path, mods.clone());
+
+        Ok(Loader {
+            settings: self.settings,
+            mods,
+            scopes,
+        })
+    }
+}
+
+pub struct Loader {
+    settings: Option<ModSettings>,
+    mods: Arc<Mods>,
+    scopes: Scopes,
+}
+
+impl Loader {
+    pub fn builder(core_path: impl AsRef<Path>) -> Builder {
+        Builder::new(core_path)
     }
 
-    pub fn mods<'a>(&'a self) -> impl Iterator<Item = Arc<Mod>> + 'a {
-        self.mods_sorted.iter().map(|fmod| Arc::clone(fmod))
+    pub fn vanilla(data_dir: impl AsRef<Path>) -> Result<Self, Error> {
+        let data_dir = data_dir.as_ref();
+        let mut builder = Builder::new(data_dir.join("core"));
+        builder.add_mod(data_dir.join("base"))?;
+        Ok(builder.finish()?)
     }
 
-    pub fn run_with_all<P: AsRef<Path>>(&self, lua: &mut Lua, file_name: P) -> Result<(), Error> {
-        for fmod in &self.mods_sorted {
-            fmod.run_lua(lua, &file_name)?;
+    fn run_with_all(&self, lua: &FactorioLua, file_name: impl AsRef<Path>) -> Result<(), Error> {
+        let file_name = file_name.as_ref();
+
+        for fmod in self.mods.iter() {
+            let scope = self.scopes.mod_scope(fmod.clone());
+            if scope.exists(file_name)? {
+                lua.set_loader(scope.clone())?;
+                lua.run_script_from_file(file_name, scope)?;
+            }
         }
+
         Ok(())
     }
 
-    pub fn settings_stage(&mut self) -> Result<(), Error> {
-        let mut lua = Lua::new();
+    fn settings_stage(&self) -> Result<(), Error> {
+        let mut lua = FactorioLua::new()?;
 
-        let mods = lua.create_table()?; // TODO
+        let mods = lua.create_table()?;
+        // todo: populate table
 
         let globals = lua.globals();
         globals.set("mods", mods)?;
@@ -617,113 +615,29 @@ impl ModLoader {
         Ok(())
     }
 
-    pub fn data_stage<T: FromLuaValue>(&mut self) -> Result<T, Error> {
-        let mut lua = unsafe { Lua::unsafe_new() };
-
-        if self.mods_sorted.is_empty() {
-            log::warn!("mods_sorted is empty. Did you forget to call check_dependencies()?")
-        }
+    pub fn data_stage<T: FromLuaValue>(&self) -> Result<T, Error> {
+        let mut lua = FactorioLua::new()?;
 
         // Initialize the lua context.
-        let defines = lua_utils::import_defines(&lua)?;
         let mods = lua.create_table()?; // TODO
         let settings = lua.create_table()?; // TODO
 
         let globals = lua.globals();
         globals.set("mods", mods)?;
         globals.set("settings", settings)?;
-        globals.set("defines", defines)?;
         drop(globals);
 
-        lua_utils::set_mod_path(&mut lua, "data/core")?;
-
-        lua_utils::run_file(&mut lua, "data/core/lualib/dataloader.lua")?;
-
-        lua_utils::run_file(&mut lua, "data/core/data.lua")?;
+        let scope = self.scopes.core_scope();
+        lua.set_loader(scope.clone())?;
+        lua.run_script_from_file("lualib/dataloader.lua", scope.clone())?;
+        lua.run_script_from_file("data.lua", scope)?;
 
         self.run_with_all(&mut lua, "data.lua")?;
         self.run_with_all(&mut lua, "data-updates.lua")?;
         self.run_with_all(&mut lua, "data-final-fixes.lua")?;
 
-        let data_raw = lua_utils::get_data_raw(&lua)?;
+        let data_raw = lua::get_data_raw(&lua)?;
 
         Ok(T::from_lua_value(data_raw)?)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use mlua::Lua;
-    use rustorio_lua_api_derive::FromLuaTable;
-
-    use super::*;
-
-    #[test]
-    fn math_pow_exists() {
-        let mut lua = Lua::new();
-
-        lua_utils::run_code(
-            &mut lua,
-            r#"
-            x = math.pow(2, 4)
-        "#,
-            "test",
-        )
-        .unwrap();
-
-        let x: u32 = lua.globals().get("x").unwrap();
-        assert_eq!(x, 16);
-    }
-
-    #[test]
-    fn it_loads_base_mod() {
-        let base_mod = Mod::open("../data/base").unwrap();
-        assert_eq!(base_mod.name(), "base");
-    }
-
-    #[test]
-    fn it_loads_mods() {
-        let mut mod_loader =
-            ModLoader::new_full("../data/core", "../data/base", "../data/mods").unwrap();
-        mod_loader.check_dependencies().unwrap();
-
-        let mods = mod_loader.mods().collect::<Vec<Arc<Mod>>>();
-
-        log::info!("Mods found");
-        for fmod in mods {
-            log::info!(" - {}", fmod.name());
-        }
-
-        //log::info!("Settings stage...");
-        //mod_loader.settings_stage().unwrap();
-
-        #[derive(FromLuaTable)]
-        struct Stub {}
-
-        log::info!("Data stage...");
-        mod_loader.data_stage::<Stub>().unwrap();
-    }
-
-    #[test]
-    fn test_data_stage() {}
-
-    #[test]
-    fn it_loads_mod_settings() {
-        let mod_settings = ModSettings::read_from_file("../data/mods/mod-settings.dat").unwrap();
-
-        log::debug!("Mod settings: {:#?}", mod_settings);
-    }
-
-    #[test]
-    fn it_parses_version() {
-        let v: Version = "1.2.3".parse().unwrap();
-        assert_eq!(v.major, 1);
-        assert_eq!(v.minor, 2);
-        assert_eq!(v.patch, 3);
-
-        let v: Version = "0.2".parse().unwrap();
-        assert_eq!(v.major, 0);
-        assert_eq!(v.minor, 2);
-        assert_eq!(v.patch, 0);
     }
 }

@@ -20,7 +20,7 @@ use std::{
 };
 
 use color_eyre::eyre::Error;
-use rustorio_lua_api::loader::ModLoader;
+use rustorio_lua_api::loader::Loader;
 use rustorio_prototype::{
     item::ItemPrototype,
     technology::TechnologyPrototype,
@@ -94,13 +94,11 @@ enum Args {
 
 impl Args {
     fn run(self) -> Result<(), Error> {
+        let loader = Loader::vanilla("data")?;
+        let prototypes: Prototypes = loader.data_stage()?;
+
         match self {
             Self::Export { output, pretty } => {
-                let mut loader = ModLoader::new_with_base("data/core", "data/base")?;
-                loader.check_dependencies()?;
-
-                let prototypes: Prototypes = loader.data_stage()?;
-
                 let output_file = OutputFile::open(output)?;
 
                 if pretty {
@@ -113,10 +111,6 @@ impl Args {
             Self::CheatSheet { output: _, config } => {
                 let config: Config = toml::from_str(&std::fs::read_to_string(&config)?)?;
 
-                let mut loader = ModLoader::new_with_base("data/core", "data/base")?;
-                loader.check_dependencies()?;
-                let prototypes: Prototypes = loader.data_stage()?;
-
                 let cheat_sheet = CheatSheet::generate(&config, &prototypes)?;
                 println!("{:#?}", cheat_sheet.research.entries);
 
@@ -124,10 +118,6 @@ impl Args {
                 //cheat_sheet.write(output_file)?;
             }
             Self::ListTechnologies => {
-                let mut loader = ModLoader::new_with_base("data/core", "data/base")?;
-                loader.check_dependencies()?;
-                let prototypes: Prototypes = loader.data_stage()?;
-
                 let mut technologies =
                     HasPrototypes::<TechnologyPrototype>::iter(&prototypes).collect::<Vec<_>>();
                 technologies.sort_by_cached_key(|t| &t.base().order);
@@ -136,10 +126,6 @@ impl Args {
                 }
             }
             Self::ListItems => {
-                let mut loader = ModLoader::new_with_base("data/core", "data/base")?;
-                loader.check_dependencies()?;
-                let prototypes: Prototypes = loader.data_stage()?;
-
                 let mut items =
                     HasPrototypes::<ItemPrototype>::iter(&prototypes).collect::<Vec<_>>();
                 items.sort_by_cached_key(|t| &t.base().name);

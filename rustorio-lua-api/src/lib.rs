@@ -4,6 +4,7 @@ pub mod loader;
 pub mod nalgebra;
 #[cfg(feature = "palette")]
 pub mod palette;
+mod utils;
 
 #[doc(hidden)]
 pub mod __private;
