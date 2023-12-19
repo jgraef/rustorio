@@ -43,6 +43,11 @@ use serde::{
 };
 
 use crate::{
+    fluid::FluidPrototype,
+    recipe::ProductPrototype,
+};
+#[allow(unused_imports)]
+use crate::{
     item::ItemPrototype,
     Id,
 };
@@ -102,6 +107,16 @@ pub struct BoundingBox {
     pub orientation: Option<f32>,
 }
 
+impl Default for BoundingBox {
+    fn default() -> Self {
+        Self {
+            top_left: Default::default(),
+            bottom_right: Default::default(),
+            orientation: Default::default(),
+        }
+    }
+}
+
 #[cfg(feature = "lua-api")]
 impl FromLuaTable for BoundingBox {
     fn from_lua_table(table: Table) -> Result<Self, Error> {
@@ -118,10 +133,37 @@ impl FromLuaTable for BoundingBox {
     }
 }
 
-#[derive(Clone, Debug, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct CollisionMask {
-    /*
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(transparent))]
+pub struct CollisionMask(Vec<CollisionMaskItem>);
+
+#[cfg(feature = "lua-api")]
+impl FromLuaValue for CollisionMask {
+    fn from_lua_value(value: Value) -> Result<Self, Error> {
+        let v: Vec<CollisionMaskItem> = FromLuaValue::from_lua_value(value)?;
+        Ok(Self(v))
+    }
+}
+
+impl Default for CollisionMask {
+    fn default() -> Self {
+        Self(vec![
+            CollisionMaskItem::ItemLayer,
+            CollisionMaskItem::ObjectLayer,
+            CollisionMaskItem::PlayerLayer,
+            CollisionMaskItem::WaterTile,
+        ])
+    }
+}
+
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "lua-api", derive(FromLuaValue))]
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(rename_all = "kebab-case")
+)]
+pub enum CollisionMaskItem {
     GroundTile,
     WaterTile,
     ResourceLayer,
@@ -132,12 +174,6 @@ pub struct CollisionMask {
     ObjectLayer,
     PlayerLayer,
     TrainLayer,
-    Layer11,
-    Layer12,
-    Layer13,
-    Layer14,
-    Layer15,
-    */
 }
 
 #[derive(Clone, Debug)]
@@ -1698,6 +1734,24 @@ pub enum IconSpecification {
     None,
 }
 
+impl IconSpecification {
+    pub fn file_name(&self) -> Option<&FileName> {
+        match self {
+            IconSpecification::Multiple {
+                icons,
+                icon_size,
+                icon_mipmaps,
+            } => Some(&icons.first()?.icon),
+            IconSpecification::Single {
+                icon,
+                icon_size,
+                icon_mipmaps,
+            } => Some(icon),
+            IconSpecification::None => None,
+        }
+    }
+}
+
 #[cfg(feature = "lua-api")]
 impl FromLuaTable for IconSpecification {
     fn from_lua_table(table: Table) -> Result<Self, Error> {
@@ -1831,9 +1885,43 @@ impl Default for LightDefinitionType {
 pub type RealOrientation = f32;
 
 #[derive(Clone, Debug)]
-#[cfg_attr(feature = "lua-api", derive(FromLuaTable))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct LocalisedString();
+pub enum LocalisedString {
+    String(String),
+    Bool(bool),
+    Number(i64),
+    Table {
+        key: String,
+        parameters: Vec<LocalisedString>,
+    },
+}
+
+#[cfg(feature = "lua-api")]
+impl FromLuaValue for LocalisedString {
+    fn from_lua_value(value: Value) -> Result<Self, Error> {
+        match value {
+            Value::Boolean(x) => Ok(Self::Bool(x)),
+            Value::String(x) => Ok(Self::String(x.to_str()?.to_owned())),
+            Value::Table(x) => {
+                let mut values = x.sequence_values::<Value>();
+                let mut parameters = vec![];
+
+                let key = String::from_lua_value(
+                    values
+                        .next()
+                        .ok_or_else(|| Error::other("expected key"))??,
+                )?;
+
+                while let Some(param) = values.next() {
+                    parameters.push(FromLuaValue::from_lua_value(param?)?);
+                }
+
+                Ok(Self::Table { key, parameters })
+            }
+            _ => Err(Error::unexpected(value)),
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "lua-api", derive(FromLuaTable))]
@@ -1920,7 +2008,31 @@ impl<I: FromLuaTable + From<(Id<ItemPrototype>, u16)>, F: FromLuaTable> FromLuaT
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "lua-api", derive(FromLuaTable))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct MinableProperties();
+pub struct MinableProperties {
+    mining_time: f64,
+
+    #[cfg_attr(feature = "lua-api", lua(default))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    results: Vec<ProductPrototype>,
+
+    result: Option<Id<ItemPrototype>>,
+
+    #[cfg_attr(feature = "lua-api", lua(default))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    fluid_amount: f64,
+
+    #[cfg_attr(feature = "lua-api", lua(default))]
+    mining_particle: Option<Id<Todo>>,
+
+    #[cfg_attr(feature = "lua-api", lua(default))]
+    required_fluid: Option<Id<FluidPrototype>>,
+
+    #[cfg_attr(feature = "lua-api", lua(default))]
+    count: Option<u16>,
+
+    #[cfg_attr(feature = "lua-api", lua(default))]
+    mining_trigger: Option<Trigger>,
+}
 
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "lua-api", derive(FromLuaTable))]

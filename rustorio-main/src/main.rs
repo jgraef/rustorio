@@ -1,10 +1,5 @@
 #![allow(dead_code)]
 
-mod cheat_sheet;
-mod config;
-mod materials;
-mod time;
-
 use std::{
     fs::File,
     io::{
@@ -29,11 +24,6 @@ use rustorio_prototype::{
     Prototypes,
 };
 use structopt::StructOpt;
-
-use crate::{
-    cheat_sheet::CheatSheet,
-    config::Config,
-};
 
 pub enum OutputFile {
     File(BufWriter<File>),
@@ -87,12 +77,6 @@ pub struct Args {
 
 #[derive(Debug, StructOpt)]
 enum Command {
-    CheatSheet {
-        #[structopt(short, long)]
-        output: Option<PathBuf>,
-
-        config: PathBuf,
-    },
     ListTechnologies,
     ListItems,
 }
@@ -108,15 +92,6 @@ impl Args {
         let prototypes: Prototypes = loader.data_stage()?;
 
         match self.command {
-            Command::CheatSheet { output: _, config } => {
-                let config: Config = toml::from_str(&std::fs::read_to_string(&config)?)?;
-
-                let cheat_sheet = CheatSheet::generate(&config, &prototypes)?;
-                println!("{:#?}", cheat_sheet.research.entries);
-
-                //let output_file = OutputFile::open(output)?;
-                //cheat_sheet.write(output_file)?;
-            }
             Command::ListTechnologies => {
                 let mut technologies =
                     HasPrototypes::<TechnologyPrototype>::iter(&prototypes).collect::<Vec<_>>();

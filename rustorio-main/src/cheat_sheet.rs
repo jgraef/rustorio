@@ -51,10 +51,7 @@ pub struct CheatSheet {
 
 impl CheatSheet {
     pub fn generate(config: &Config, prototypes: &Prototypes) -> Result<Self, Error> {
-        let mut cheat_sheet = CheatSheet {
-            research: Research { entries: vec![] },
-        };
-
+        let mut entries = vec![];
         let mut lab_setup_iter = config.research.lab_setup.iter().peekable();
         let mut lab_setup = lab_setup_iter.next().unwrap();
         let mut lab_speed_modifier: f64 = 1.0;

@@ -1,4 +1,5 @@
-mod lua;
+pub mod files;
+pub mod lua;
 
 use std::{
     cmp::Ordering,
@@ -28,16 +29,22 @@ use byteorder::{
     ReadBytesExt,
 };
 use lazy_static::lazy_static;
+use mlua::{
+    Table,
+    Value,
+};
 use regex::Regex;
 use rustorio_proptree::Value as PropertyTree;
 use serde::Deserialize;
 use thiserror::Error;
 
-use self::lua::{
-    FactorioLua,
-    ModFiles,
-    PathError,
-    Scopes,
+use self::{
+    files::{
+        ModFiles,
+        PathError,
+        Scopes,
+    },
+    lua::FactorioLua,
 };
 use crate::FromLuaValue;
 
@@ -66,9 +73,6 @@ pub enum Error {
 
     #[error("Error while parsing property tree: {0}")]
     PropertyTree(#[from] rustorio_proptree::Error),
-
-    #[error("Error while converting Lua value: {0}")]
-    LuaApi(#[from] crate::Error),
 
     #[error("zip error")]
     Zip(#[from] zip::result::ZipError),
@@ -622,7 +626,7 @@ impl Loader {
         Ok(())
     }
 
-    pub fn data_stage<T: FromLuaValue>(&self) -> Result<T, Error> {
+    pub fn data_stage<T: FromLuaValue>(&self) -> Result<T, crate::Error> {
         let mut lua = FactorioLua::new()?;
 
         // Initialize the lua context.
@@ -643,7 +647,10 @@ impl Loader {
         self.run_with_all(&mut lua, "data-updates.lua")?;
         self.run_with_all(&mut lua, "data-final-fixes.lua")?;
 
-        let data_raw = lua::get_data_raw(&lua)?;
+        let data_raw = lua
+            .globals()
+            .get::<_, Table>("data")?
+            .get::<_, Value>("raw")?;
 
         Ok(T::from_lua_value(data_raw)?)
     }

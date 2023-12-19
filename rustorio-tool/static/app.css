@@ -1,0 +1,45 @@
+
+body {
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+}
+
+html {
+    height: -webkit-fill-available;
+}
+
+#root {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-height: 100vh;
+}
+
+main {
+    display: flex;
+    flex-wrap: nowrap;
+    flex-grow: 1;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 1em;
+}
+
+.navbar {
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+.navbar-brand-text {
+    font-weight: 600;
+    font-size: larger;
+    padding-left: 8px;
+}
+
+.sidebar {
+    width: 200px;
+}
+
+.nav-icon {
+    width: 2em;
+    margin-right: 4px;
+}

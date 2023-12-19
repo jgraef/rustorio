@@ -215,14 +215,6 @@ impl MaterialAmounts {
             )
     }
 
-    fn iter_values<'a>(&'a self) -> impl Iterator<Item = f64> + 'a {
-        self.items
-            .iter()
-            .map(|(_, v)| v)
-            .chain(self.fluids.iter().map(|(_, v)| v))
-            .copied()
-    }
-
     pub fn elementwise_min(&self, rhs: &Self) -> Self {
         self.zip(rhs, |lhs, rhs| lhs.min(rhs))
     }

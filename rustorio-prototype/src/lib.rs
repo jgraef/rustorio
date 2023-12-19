@@ -14,6 +14,7 @@ use std::{
     sync::Arc,
 };
 
+use entity::LabPrototype;
 #[cfg(feature = "lua-api")]
 use rustorio_lua_api::{
     mlua::{
@@ -98,12 +99,26 @@ impl InheritsBase for PrototypeBase {
 #[cfg_attr(feature = "lua-api", derive(FromLuaTable))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Prototypes {
+    #[cfg_attr(feature = "serde", serde(default))]
     achievement: PrototypeMap<AchievementPrototype>,
+
+    #[cfg_attr(feature = "serde", serde(default))]
     technology: PrototypeMap<TechnologyPrototype>,
+
+    #[cfg_attr(feature = "serde", serde(default))]
     recipe: PrototypeMap<RecipePrototype>,
+
+    #[cfg_attr(feature = "serde", serde(default))]
     item: PrototypeMap<ItemPrototype>,
+
+    #[cfg_attr(feature = "serde", serde(default))]
     tool: PrototypeMap<ToolPrototype>,
+
+    #[cfg_attr(feature = "serde", serde(default))]
     module: PrototypeMap<ModulePrototype>,
+
+    #[cfg_attr(feature = "serde", serde(default))]
+    lab: PrototypeMap<LabPrototype>,
 }
 
 pub trait HasPrototypes<P: 'static> {
@@ -191,9 +206,25 @@ impl HasPrototypes<ModulePrototype> for Prototypes {
     }
 }
 
+impl HasPrototypes<LabPrototype> for Prototypes {
+    fn get(&self, id: &Id<LabPrototype>) -> Option<&LabPrototype> {
+        self.lab.get(id)
+    }
+
+    fn iter(&self) -> impl Iterator<Item = &LabPrototype> {
+        self.lab.iter()
+    }
+}
+
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(transparent))]
 pub struct PrototypeMap<P>(HashMap<String, P>);
+
+impl<P> Default for PrototypeMap<P> {
+    fn default() -> Self {
+        Self(Default::default())
+    }
+}
 
 #[cfg(feature = "lua-api")]
 impl<P: FromLuaTable> FromLuaTable for PrototypeMap<P> {
@@ -273,6 +304,24 @@ impl<P> From<String> for Id<P> {
     fn from(id: String) -> Self {
         Id {
             id: Arc::new(id),
+            _t: PhantomData,
+        }
+    }
+}
+
+impl<P> From<Arc<String>> for Id<P> {
+    fn from(id: Arc<String>) -> Self {
+        Self {
+            id,
+            _t: PhantomData,
+        }
+    }
+}
+
+impl<'a, P> From<&'a str> for Id<P> {
+    fn from(id: &'a str) -> Self {
+        Self {
+            id: Arc::new(id.to_owned()),
             _t: PhantomData,
         }
     }

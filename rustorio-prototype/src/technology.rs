@@ -77,11 +77,17 @@ pub struct TechnologyData {
     pub max_level: Option<MaxLevel>,
 
     #[cfg_attr(feature = "lua-api", lua(default))]
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Vec::is_empty"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Vec::is_empty")
+    )]
     pub effects: Vec<Modifier>,
 
     #[cfg_attr(feature = "lua-api", lua(default))]
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Vec::is_empty"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Vec::is_empty")
+    )]
     pub prerequisites: Vec<String>,
 }
 

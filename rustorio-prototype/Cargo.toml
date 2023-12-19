@@ -25,5 +25,5 @@ optional = true
 
 [features]
 default = []
-serde = ["dep:serde", "rustorio-lua-api/serde", "bigdecimal/serde"]
+serde = ["dep:serde", "bigdecimal/serde", "nalgebra/serde-serialize", "palette/serializing"]
 lua-api = ["dep:rustorio-lua-api"]

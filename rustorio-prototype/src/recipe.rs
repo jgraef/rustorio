@@ -73,11 +73,17 @@ pub struct RecipeCategory {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct RecipeData {
     #[cfg_attr(feature = "lua-api", lua(default))]
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Vec::is_empty"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Vec::is_empty")
+    )]
     pub ingredients: Vec<IngredientPrototype>,
 
     #[cfg_attr(feature = "lua-api", lua(default))]
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Vec::is_empty"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Vec::is_empty")
+    )]
     pub results: Vec<ProductPrototype>,
 
     #[cfg_attr(feature = "lua-api", lua(default))]

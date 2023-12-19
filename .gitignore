@@ -3,3 +3,5 @@
 /.env
 /.vscode
 /Cargo.lock
+/rustorio-tool/data
+/rustorio-tool/dist

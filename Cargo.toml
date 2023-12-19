@@ -11,4 +11,8 @@ members = [
     "rustorio-prototype",
     "rustorio-remote/factorio-remote",
     "rustorio-remote/factorio-data",
+    "rustorio-tool",
+]
+exclude = [
+    #"rustorio-tool",
 ]
