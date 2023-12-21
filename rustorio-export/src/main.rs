@@ -1,21 +1,9 @@
 mod export;
 
-use std::{
-    fs::File,
-    io::{
-        stdout,
-        BufWriter,
-        Stdout,
-        Write,
-    },
-    path::{
-        Path,
-        PathBuf,
-    },
-};
+use std::path::PathBuf;
 
 use color_eyre::eyre::Error;
-use rustorio_lua_api::loader::Loader;
+use rustorio_loader::Loader;
 use rustorio_prototype::Prototypes;
 use structopt::StructOpt;
 

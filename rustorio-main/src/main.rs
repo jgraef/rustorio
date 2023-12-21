@@ -15,7 +15,7 @@ use std::{
 };
 
 use color_eyre::eyre::Error;
-use rustorio_lua_api::loader::Loader;
+use rustorio_loader::Loader;
 use rustorio_prototype::{
     item::ItemPrototype,
     technology::TechnologyPrototype,

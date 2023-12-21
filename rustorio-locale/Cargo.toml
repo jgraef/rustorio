@@ -1,0 +1,9 @@
+[package]
+name = "rustorio-locale"
+version = "0.1.0"
+authors = ["Janosch Gräf <janosch.graef@gmail.com>"]
+edition = "2021"
+
+[dependencies]
+thiserror = "1.0"
+nom = "7.1"

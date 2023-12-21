@@ -13,7 +13,7 @@ use serde::{
     forward_to_deserialize_any,
 };
 
-use crate::error::Error;
+use super::Error;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum PropertyType {
@@ -123,7 +123,7 @@ impl<'de> Deserializer<'de> {
 }
 
 impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
-    type Error = crate::error::Error;
+    type Error = Error;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
@@ -162,7 +162,7 @@ pub struct KeyDeserializer<'de, 'a> {
 }
 
 impl<'de, 'a> de::Deserializer<'de> for KeyDeserializer<'de, 'a> {
-    type Error = crate::error::Error;
+    type Error = Error;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where

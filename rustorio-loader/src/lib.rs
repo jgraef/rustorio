@@ -1,5 +1,7 @@
 pub mod files;
 pub mod lua;
+pub mod proptree;
+mod utils;
 
 use std::{
     cmp::Ordering,
@@ -34,19 +36,19 @@ use mlua::{
     Value,
 };
 use regex::Regex;
-use rustorio_proptree::Value as PropertyTree;
+use rustorio_lua_api::FromLuaValue;
 use serde::Deserialize;
 use thiserror::Error;
 
-use self::{
+use crate::{
     files::{
         ModFiles,
         PathError,
         Scopes,
     },
     lua::FactorioLua,
+    proptree::Value as PropertyTree,
 };
-use crate::FromLuaValue;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -72,7 +74,7 @@ pub enum Error {
     DuplicateMod(String, String),
 
     #[error("Error while parsing property tree: {0}")]
-    PropertyTree(#[from] rustorio_proptree::Error),
+    PropertyTree(#[from] crate::proptree::Error),
 
     #[error("zip error")]
     Zip(#[from] zip::result::ZipError),
@@ -82,6 +84,9 @@ pub enum Error {
 
     #[error("file not found: {0}")]
     FileNotFound(PathBuf),
+
+    #[error("lua-api error")]
+    LuaApi(#[from] rustorio_lua_api::Error),
 }
 
 lazy_static! {
@@ -475,7 +480,7 @@ impl ModSettings {
         let mut buf = vec![];
         reader.read_to_end(&mut buf)?;
 
-        let settings = rustorio_proptree::from_slice(&buf)?;
+        let settings = crate::proptree::from_slice(&buf)?;
 
         Ok(ModSettings {
             version,

@@ -13,7 +13,7 @@ use image::{
     io::Reader as ImageReader,
     ImageFormat,
 };
-use rustorio_lua_api::loader::Loader;
+use rustorio_loader::Loader;
 use rustorio_prototype::{
     achievement::AchievementPrototype,
     item::ItemPrototype,

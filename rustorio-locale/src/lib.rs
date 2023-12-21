@@ -12,11 +12,6 @@ use serde::{
     Serialize,
 };
 
-use crate::{
-    loader::files::ModFiles,
-    Error,
-};
-
 #[derive(Debug, thiserror::Error)]
 pub enum ParseError {
     #[error("{0}")]
@@ -81,7 +76,7 @@ pub struct Locale {
 }
 
 impl Locale {
-    pub fn load(files: &ModFiles, language: &str) -> Result<Self, Error> {
+    /*pub fn load(files: &ModFiles, language: &str) -> Result<Self, Error> {
         let mut locale = Self::default();
         let dir = Path::new("locale").join(language);
 
@@ -93,7 +88,7 @@ impl Locale {
         }
 
         Ok(locale)
-    }
+    }*/
 
     pub fn parse(input: &str) -> Result<Locale, ParseError> {
         match parser::parse_locale(input) {

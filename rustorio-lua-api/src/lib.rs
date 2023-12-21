@@ -1,11 +1,7 @@
-//pub mod value;
-pub mod loader;
-pub mod locale;
 #[cfg(feature = "nalgebra")]
 pub mod nalgebra;
 #[cfg(feature = "palette")]
 pub mod palette;
-mod utils;
 
 #[doc(hidden)]
 pub mod __private;
@@ -79,12 +75,6 @@ pub enum Error {
 
     #[error("{0}")]
     Other(String),
-
-    #[error("loader error")]
-    Loader(#[from] loader::Error),
-
-    #[error("localization parse error")]
-    LocalizationParse(#[from] crate::locale::ParseError),
 }
 
 impl Error {

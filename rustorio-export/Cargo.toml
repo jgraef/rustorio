@@ -18,5 +18,5 @@ image = "0.24"
 path = "../rustorio-prototype"
 features = ["lua-api", "serde"]
 
-[dependencies.rustorio-lua-api]
-path = "../rustorio-lua-api"
+[dependencies.rustorio-loader]
+path = "../rustorio-loader"
